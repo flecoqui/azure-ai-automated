@@ -58,9 +58,9 @@ Once the Git client is installed you can clone the repository on your machine ru
     For instance:
 
     ```bash
-        c:\git> git clone  https://github.com/flecoqui/fabric-automated.git
-        c:\git> cd ./fabric-automated
-        c:\git\fabric-automated>
+        c:\git> git clone  https://github.com/flecoqui/azure-ai-automated.git
+        c:\git> cd ./azure-ai-automated
+        c:\git\azure-ai-automated>
     ```
 
 ### Using Dev Container
@@ -109,7 +109,7 @@ You need to install the following pre-requisite on your machine
 6. And from the terminal, you have access to the tools installed in the Dev Container like az client,....
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ az login
+        vscode ➜ /workspaces/azure-ai-automated (main) $ az login
     ```
 
 ### How to deploy infrastructure from the Dev Container terminal
@@ -136,18 +136,18 @@ Follow the steps below to establish with your Azure Subscription where you want 
 Usually this step is not required in a pipeline as the connection with Azure is already established.
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh   -a azure-login
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a azure-login
     ```
 
     After this step the default Azure subscription has been selected. You can still change the Azure subscription, using Azure CLI command below:
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ az account set --subscription <azure-subscription-id>
+        vscode ➜ /workspaces/azure-ai-automated (main) $ az account set --subscription <azure-subscription-id>
     ```
     Using the command below you can define the Azure region, subscription, the tenant and the environment where Microsoft Foundry and Azure Machine Learning will be deployed.
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh -a azure-login -r <azure_region> -e dev -s <subscription_id> -t <tenant_id>
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh -a azure-login -r <azure_region> -e dev -s <subscription_id> -t <tenant_id>
     ```
 
     After this step, the variables AZURE_REGION, AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID and AZURE_ENVIRONMENT used for the deployment are stored in the file ./.config/.default.env.
@@ -157,7 +157,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     where [visibility] value is 'pri' for private deployment and 'pub' for public deployment.
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ cat ./.config/.default.env
+        vscode ➜ /workspaces/azure-ai-automated (main) $ cat ./.config/.default.env
         AZURE_REGION=westus3
         AZURE_SUFFIX=to-be-updated (4 digits)
         AZURE_SUBSCRIPTION_ID=to-be-updated
@@ -233,7 +233,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 1. Once you are connected to your Azure subscription, you can now deploy a Microsoft Foundry and Azure Machine Learning infrastructure associated with public endpoints.
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh   -a deploy-public-azure-ai
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a deploy-public-azure-ai
     ```
 
     After this step, the variables AZURE_SUFFIX and PURVIEW_PRINCIPAL_ID used for the deployment are stored in the file ./.config/.default.env.
@@ -241,7 +241,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
    
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ cat ./.config/.default.env
+        vscode ➜ /workspaces/azure-ai-automated (main) $ cat ./.config/.default.env
         AZURE_REGION=westus3
         AZURE_SUBSCRIPTION_ID=to-be-completed
         AZURE_TENANT_ID=to-be-completed
@@ -259,7 +259,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 2. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, you can now deploy a datasources (Azure Storage Account ADLS gen2, Synapse Workspace, Synapse Azure Storage Account ADLS gen2, PostgreSQL pool) associated with public endpoints. 
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh   -a deploy-public-datasource
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a deploy-public-datasource
     ```
     After this step, dataset files are copied in the container 'test01' in the new storage.
 
@@ -269,8 +269,8 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 6. When your test are over, you can remove the infrastructure running the following commands:
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh   -a remove-public-azure-ai
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh   -a remove-public-datasource
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a remove-public-azure-ai
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a remove-public-datasource
     ```
 
 
@@ -279,14 +279,14 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 1. Once you are connected to your Azure subscription, you can now deploy a Microsoft Foundry and Azure Machine Learning infrastructure associated with private endpoints.
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh   -a deploy-private-azure-ai
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a deploy-private-azure-ai
     ```
 
     After this step, the variables AZURE_SUFFIX and PURVIEW_PRINCIPAL_ID used for the deployment are stored in the file ./.config/.default.env.
     AZURE_SUFFIX is used to name the Azure resource. For a private endpoint deployement with suffix will be "${AZURE_ENVIRONMENT}pub${AZURE_SUFFIX}", and "${AZURE_ENVIRONMENT}pri${AZURE_SUFFIX}" for a deployment with private endpoints
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ cat ./.config/.default.env
+        vscode ➜ /workspaces/azure-ai-automated (main) $ cat ./.config/.default.env
         AZURE_REGION=westus3
         AZURE_SUBSCRIPTION_ID=to-be-completed
         AZURE_TENANT_ID=to-be-completed
@@ -329,5 +329,5 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 1. When your tests are over, you can remove the infrastructure running the following commands:
 
     ```bash
-        vscode ➜ /workspaces/fabric-automated (main) $ ./infra/deploy-infra.sh   -a remove-private-azure-ai
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a remove-private-azure-ai
     ```
