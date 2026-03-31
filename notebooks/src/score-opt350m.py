@@ -2,7 +2,7 @@ import json
 import torch
 import os
 import logging
-from transformers import AutoTokenizer, OPTForCausalLM, AutoModelForCausalLM
+from transformers import AutoTokenizer, OPTForCausalLM
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -18,16 +18,8 @@ def init():
     logger.info(f"Files in model_dir: {os.listdir(model_dir)}")
 
     tokenizer = AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
-    # model = AutoModelForCausalLM.from_pretrained(model_dir, local_files_only=True)
     model = OPTForCausalLM.from_pretrained(model_dir, local_files_only=True)
     model.eval()
-
-# def init():
-#    global model, tokenizer
-#    model_dir = "./model"  # Azure mounts model here automatically
-#    tokenizer = AutoTokenizer.from_pretrained(model_dir)
-#    model = OPTForCausalLM.from_pretrained(model_dir)
-#    model.eval()
 
 def run(raw_data):
     logger.info(f"raw_data={raw_data}")
