@@ -505,83 +505,22 @@ getCurrentObjectType() {
   fi
   echo "$ObjectType"
 }
-##############################################################################
-#- createFabricWorkspace
-##############################################################################
-createFabricWorkspace() {
-  TOKEN=$(az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv)
-  WORKSPACE_NAME=$1
-  FABRIC_CAPACITY_ID=$(curl --request GET \
-  --url "https://api.fabric.microsoft.com/v1/capacities" \
-  --header "Authorization: Bearer $TOKEN" --fail --silent --show-error  | jq -r ".value[] | select(.sku==\"${FABRIC_SKU}\") | .id")    
-  
-  curl --request POST \
-    --url "https://api.fabric.microsoft.com/v1/workspaces" \
-    --header "Authorization: Bearer $TOKEN" \
-    --header "Content-Type: application/json" \
-    --fail --silent --show-error \
-    --data "{\"displayName\": \"${WORKSPACE_NAME}\",\"capacityId\": \"${FABRIC_CAPACITY_ID}\"}"    
-}
-##############################################################################
-#- getFabricWorkspaceId
-##############################################################################
-getFabricWorkspaceId() {
-TOKEN=$(az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv)
-  WORKSPACE_NAME=$1
-  curl --request GET \
-    --url "https://api.fabric.microsoft.com/v1/workspaces" \
-    --header "Authorization: Bearer $TOKEN" \
-    --header "Content-Type: application/json" \
-    --fail --silent --show-error | jq -r ".value[] | select(.displayName==\"${WORKSPACE_NAME}\") | .id"     
-}
-##############################################################################
-#- createFabricWorkspaceIdentity
-##############################################################################
-createFabricWorkspaceIdentity() {
-WORKSPACE_ID=$1
-TOKEN=$(az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv)
-
-curl --request POST \
-    --url "https://api.fabric.microsoft.com/v1/workspaces/${WORKSPACE_ID}/provisionIdentity" \
-    --header "Authorization: Bearer $TOKEN" \
-    --header "Content-Type: application/json" \
-    --data '' \
-    --fail --silent --show-error 
-}
-
-##############################################################################
-#- getFabricWorkspaceIdentity
-##############################################################################
-getFabricWorkspaceIdentity() {
-  WORKSPACE_ID=$1
-  TOKEN=$(az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv)
-
-  curl --request GET \
-    --url "https://api.fabric.microsoft.com/v1/workspaces/${WORKSPACE_ID}" \
-    --header "Authorization: Bearer $TOKEN" \
-    --header "Content-Type: application/json" \
-    --fail --silent --show-error | jq -r '.workspaceIdentity.servicePrincipalId'
-}
-
-##############################################################################
-#- getFabricToken
-##############################################################################
-getFabricToken() {
-  bearer_token=$(az account get-access-token --resource https://fabric.azure.net --output json | jq -r .accessToken)
-  echo "$bearer_token"
-}
-
 
 ##############################################################################
 #- updateSecretInKeyVault: Update secret in Key Vault
 #  arg 1: Key Vault Name
 #  arg 2: secret name
 #  arg 3: Value
+#  arg 4: verbose (true/false)
 ##############################################################################
 updateSecretInKeyVault(){
     kv="$1"
     secret="$2"
     value="$3"
+    verbose="$4"
+    if [ "$verbose" = "true" ]; then
+        printProgress "Updating secret in Key Vault: ${kv} secret name: ${secret}"
+    fi
 
     cmd="az keyvault secret set --vault-name \"${kv}\" --name \"${secret}\" --value \"${value}\" --output none"
     # printProgress "${cmd}"
@@ -593,10 +532,15 @@ updateSecretInKeyVault(){
 #- readSecretInKeyVault: Read secret from Key Vault
 #  arg 1: Key Vault Name
 #  arg 2: secret name
+#  arg 3: verbose (true/false)
 ##############################################################################
 readSecretInKeyVault(){
     kv="$1"
     secret="$2"
+    verbose="$3"
+    if [ "$verbose" = "true" ]; then
+        printProgress "Reading secret from Key Vault: ${kv} secret name: ${secret}"
+    fi
 
     cmd="az keyvault secret show --vault-name \"${kv}\" --name \"${secret}\"  --query \"value\" -o tsv "
     #printProgress "${cmd}"
@@ -968,52 +912,79 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     checkError
     
     printProgress "Store secrets in Key Vault"
-    AZURE_ML_MODEL_ID_SECRET_NAME="AZURE-ML-MODEL-ID"
-    AZURE_ML_MODEL_ID_SECRET="facebook/opt-350m" 
-    AZURE_ML_MODEL_NAME_SECRET_NAME="AZURE-ML-MODEL-NAME" 
-    AZURE_ML_MODEL_NAME_SECRET="model_custom" 
-    AZURE_ML_ENDPOINT_NAME_SECRET_NAME="AZURE-ML-ENDPOINT-NAME" 
-    AZURE_ML_ENDPOINT_NAME_SECRET="model-endpoint" 
-    AZURE_ML_ENV_NAME_SECRET_NAME="AZURE-ML-ENV-NAME" 
-    AZURE_ML_ENV_NAME_SECRET="model_env" 
-    AZURE_ML_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-INSTANCE-TYPE" 
-    AZURE_ML_INSTANCE_TYPE_SECRET="Standard_NC4as_T4_v3" 
-    AZURE_ML_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-SCORING-SCRIPT"
-    AZURE_ML_SCORE_SCRIPT_SECRET="score.py" 
+    AZURE_ML_MODEL_EMPTY_ID_SECRET_NAME="AZURE-ML-MODEL-EMPTY-ID"
+    AZURE_ML_MODEL_EMPTY_ID_SECRET="Qwen/Qwen2-1.5B" 
+    AZURE_ML_MODEL_EMPTY_NAME_SECRET_NAME="AZURE-ML-MODEL-EMPTY-NAME"
+    AZURE_ML_MODEL_EMPTY_NAME_SECRET="empty" 
+    AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-EMPTY-SCORE-SCRIPT"
+    AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET="score-empty.py" 
+    AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-EMPTY-INSTANCE-TYPE" 
+    AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET="Standard_DS11_v2" 
+
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_ID_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_ID_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET} true
+
+    AZURE_ML_MODEL_OPT350M_ID_SECRET_NAME="AZURE-ML-MODEL-OPT350M-ID"
+    AZURE_ML_MODEL_OPT350M_ID_SECRET="facebook/opt-350m" 
+    AZURE_ML_MODEL_OPT350M_NAME_SECRET_NAME="AZURE-ML-MODEL-OPT350M-NAME"
+    AZURE_ML_MODEL_OPT350M_NAME_SECRET="opt350m" 
+    AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-OPT350M-SCORE-SCRIPT"
+    AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET="score-opt350m.py" 
+    AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-OPT350M-INSTANCE-TYPE" 
+    AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET="Standard_NC4as_T4_v3" 
+
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_ID_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_ID_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_NAME_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_NAME_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET} true
+
+    AZURE_ML_MODEL_QWEN215B_ID_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-ID"
+    AZURE_ML_MODEL_QWEN215B_ID_SECRET="Qwen/Qwen2-1.5B" 
+    AZURE_ML_MODEL_QWEN215B_NAME_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-NAME"
+    AZURE_ML_MODEL_QWEN215B_NAME_SECRET="qwen215b" 
+    AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-SCORE-SCRIPT"
+    AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET="score-qwen2-15b.py" 
+    AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-INSTANCE-TYPE" 
+    AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET="Standard_NC4as_T4_v3"
+
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_ID_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_ID_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_NAME_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_NAME_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET} true
+
+    AZURE_ML_MODEL_PREFIX_SECRET_NAME="AZURE-ML-MODEL-PREFIX" 
+    AZURE_ML_MODEL_PREFIX_SECRET="mdl" 
+    AZURE_ML_ENDPOINT_PREFIX_SECRET_NAME="AZURE-ML-ENDPOINT-PREFIX" 
+    AZURE_ML_ENDPOINT_PREFIX_SECRET="edp" 
+    AZURE_ML_ENV_PREFIX_SECRET_NAME="AZURE-ML-ENV-PREFIX" 
+    AZURE_ML_ENV_PREFIX_SECRET="env" 
     AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME="AZURE-ML-SUBSCRIPTION-ID" 
     AZURE_ML_SUBSCRIPTION_ID_SECRET=${AZURE_SUBSCRIPTION_ID} 
     AZURE_ML_RESOURCE_GROUP_SECRET_NAME="AZURE-ML-RESOURCE-GROUP" 
     AZURE_ML_RESOURCE_GROUP_SECRET=${AZURE_RESOURCE_GROUP_AZURE_AI_NAME} 
     AZURE_ML_WORKSPACE_NAME_SECRET_NAME="AZURE-ML-WORKSPACE-NAME"
     AZURE_ML_WORKSPACE_NAME_SECRET=${AZURE_ML_NAME} 
-
-    printProgress "Updating secrets ${AZURE_ML_MODEL_ID_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_ID_SECRET_NAME} ${AZURE_ML_MODEL_ID_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_MODEL_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_NAME_SECRET_NAME} ${AZURE_ML_MODEL_NAME_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_ENDPOINT_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENDPOINT_NAME_SECRET_NAME} ${AZURE_ML_ENDPOINT_NAME_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_ENV_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENV_NAME_SECRET_NAME} ${AZURE_ML_ENV_NAME_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_INSTANCE_TYPE_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_INSTANCE_TYPE_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_SCORE_SCRIPT_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_SCORE_SCRIPT_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_RESOURCE_GROUP_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET}
-    printProgress "Updating secrets ${AZURE_ML_WORKSPACE_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET}
-
+    
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_PREFIX_SECRET_NAME} ${AZURE_ML_MODEL_PREFIX_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENDPOINT_PREFIX_SECRET_NAME} ${AZURE_ML_ENDPOINT_PREFIX_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENV_PREFIX_SECRET_NAME} ${AZURE_ML_ENV_PREFIX_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET} true
 
 
     printProgress "Uploading notebooks to Azure Storage ${AZURE_STORAGE_ACCOUNT_NAME} ..."
-    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/safety-evaluation.ipynb" "Users/shared/safety-evaluation.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-empty.ipynb" "Users/shared/deploy-model-empty.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-empty.ipynb" "Users/shared/evaluation-model-empty.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-opt350m.ipynb" "Users/shared/deploy-model-opt350m.ipynb"
-    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score.py" "Users/shared/src/score.py"
-    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../.env" "Users/shared/.env"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-opt350m.ipynb" "Users/shared/evaluation-model-opt350m.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-qwen2-15b.ipynb" "Users/shared/deploy-model-qwen2-15b.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-qwen2-15b.ipynb" "Users/shared/evaluation-model-qwen2-15b.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-empty.py" "Users/shared/src/score-empty.py"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-opt350m.py" "Users/shared/src/score-opt350m.py"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-qwen2-15b.py" "Users/shared/src/score-qwen2-15b.py"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_ML_NAME "${AZURE_ML_NAME}"
