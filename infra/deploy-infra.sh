@@ -2,7 +2,7 @@
 ##########################################################################################################################################################################################
 #- Purpose: Script used to install pre-requisites, deploy/undeploy service, start/stop service, test service
 #- Parameters are:
-#- [-a] ACTION - value: azure-login, deploy-public-azure-ai, deploy-public-datasource, deploy-private-azure-ai, deploy-private-datasource, 
+#- [-a] ACTION - value: azure-login, deploy-public-azure-ai, deploy-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai
 #- [-e] environment - "dev", "stag", "preprod", "prod"
 #- [-c] Sets the configuration file
 #- [-t] Sets deployment Azure Tenant Id
@@ -66,7 +66,7 @@ printProgress(){
 usage() {
     echo
     echo "Arguments:"
-    printf " -a  Sets deploy-infra ACTION { azure-login, deploy-public-azure-ai, deploy-public-datasource, deploy-private-azure-ai, deploy-private-datasource, remove-public-azure-ai, remove-private-azure-ai, remove-public-datasource, remove-private-datasource}\n"
+    printf " -a  Sets deploy-infra ACTION { azure-login, deploy-public-azure-ai, deploy-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai }\n"
     printf " -e  Sets the environment - by default 'dev' ('dev', 'test', 'stag', 'prep', 'prod')\n"
     printf " -s  Sets subscription id \n"
     printf " -t  Sets tenant id\n"
@@ -158,63 +158,32 @@ setAzureResourceNames()
     AZURE_DNS_DELEGATION_SUBNET_NAME=$(echo ${RESULT}  | jq -r '.dnsDelegationSubNetName.value' 2>/dev/null)
     echo "AZURE_DNS_DELEGATION_SUBNET_NAME: $AZURE_DNS_DELEGATION_SUBNET_NAME"
 
-    AZURE_FABRIC_ACCOUNT_NAME=$(echo ${RESULT}  | jq -r '.fabricAccountName.value' 2>/dev/null)
-    echo "AZURE_FABRIC_ACCOUNT_NAME: $AZURE_FABRIC_ACCOUNT_NAME"
-    AZURE_FABRIC_WORKSPACE_NAME=$(echo ${RESULT}  | jq -r '.fabricWorkspaceName.value' 2>/dev/null)
-    echo "AZURE_FABRIC_WORKSPACE_NAME: $AZURE_FABRIC_WORKSPACE_NAME"
+    AZURE_FOUNDRY_NAME=$(echo ${RESULT}  | jq -r '.foundryName.value' 2>/dev/null)
+    echo "AZURE_FOUNDRY_NAME: $AZURE_FOUNDRY_NAME"
+    AZURE_FOUNDRY_PROJECT_NAME=$(echo ${RESULT}  | jq -r '.foundryProjectName.value' 2>/dev/null)
+    echo "AZURE_FOUNDRY_PROJECT_NAME: $AZURE_FOUNDRY_PROJECT_NAME"
+    AZURE_ML_NAME=$(echo ${RESULT}  | jq -r '.azureMLName.value' 2>/dev/null)
+    echo "AZURE_ML_NAME: $AZURE_ML_NAME"
 
     AZURE_STORAGE_ACCOUNT_NAME=$(echo ${RESULT}  | jq -r '.storageAccountName.value' 2>/dev/null)
     echo "AZURE_STORAGE_ACCOUNT_NAME: $AZURE_STORAGE_ACCOUNT_NAME"
     AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME=$(echo ${RESULT}  | jq -r '.storageAccountDefaultContainerName.value' 2>/dev/null)
-    echo "AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME: $AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME"
-    AZURE_COSMOS_DB_NAME=$(echo ${RESULT}  | jq -r '.cosmosDBName.value' 2>/dev/null)
-    echo "AZURE_COSMOS_DB_NAME: $AZURE_COSMOS_DB_NAME"
-    AZURE_POSTGRESQL_NAME=$(echo ${RESULT}  | jq -r '.postgreSqlServerName.value' 2>/dev/null)
-    echo "AZURE_POSTGRESQL_NAME: $AZURE_POSTGRESQL_NAME"
-    
+    echo "AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME: $AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME"    
     AZURE_KEY_VAULT_NAME=$(echo ${RESULT}  | jq -r '.keyVaultName.value' 2>/dev/null)
     echo "AZURE_KEY_VAULT_NAME: $AZURE_KEY_VAULT_NAME"
 
-    AZURE_FOUNDRY_NAME=$(echo ${RESULT}  | jq -r '.foundryName.value' 2>/dev/null)
-    echo "AZURE_FOUNDRY_NAME: $AZURE_FOUNDRY_NAME"
-    AZURE_FOUNDRY_STORAGE_NAME=$(echo ${RESULT}  | jq -r '.foundryStorageName.value' 2>/dev/null)
-    echo "AZURE_FOUNDRY_STORAGE_NAME: $AZURE_FOUNDRY_STORAGE_NAME"
     AZURE_ACR_NAME=$(echo ${RESULT}  | jq -r '.acrName.value' 2>/dev/null)
     echo "AZURE_ACR_NAME: $AZURE_ACR_NAME"
     AZURE_APP_INSIGHTS_NAME=$(echo ${RESULT}  | jq -r '.appInsightsName.value' 2>/dev/null)
     echo "AZURE_APP_INSIGHTS_NAME: $AZURE_APP_INSIGHTS_NAME"
-
-    AZURE_DATAGW_VM_NAME=$(echo ${RESULT}  | jq -r '.datagwVMName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_VM_NAME: $AZURE_DATAGW_VM_NAME"
-    AZURE_DATAGW_VM_LOGIN_SECRET_NAME=$(echo ${RESULT}  | jq -r '.datagwVMLoginSecretName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_VM_LOGIN_SECRET_NAME: $AZURE_DATAGW_VM_LOGIN_SECRET_NAME"
-    AZURE_DATAGW_VM_PASSWORD_SECRET_NAME=$(echo ${RESULT}  | jq -r '.datagwVMPassSecretName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_VM_PASSWORD_SECRET_NAME: $AZURE_DATAGW_VM_PASSWORD_SECRET_NAME"
-    AZURE_DATAGW_VM_RECOVERY_KEY_SECRET_NAME=$(echo ${RESULT}  | jq -r '.datagwVMRecoveryKeySecretName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_VM_RECOVERY_KEY_SECRET_NAME: $AZURE_DATAGW_VM_RECOVERY_KEY_SECRET_NAME"
-    AZURE_DATAGW_CERTIFICATE_SECRET_NAME=$(echo ${RESULT}  | jq -r '.datagwCertificateSecretName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_CERTIFICATE_SECRET_NAME: $AZURE_DATAGW_CERTIFICATE_SECRET_NAME"
-    AZURE_DATAGW_CERTIFICATE_PASSWORD_SECRET_NAME=$(echo ${RESULT}  | jq -r '.datagwCertificatePassSecretName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_CERTIFICATE_PASSWORD_SECRET_NAME: $AZURE_DATAGW_CERTIFICATE_PASSWORD_SECRET_NAME"
-    AZURE_DATAGW_CERTIFICATE_NAME=$(echo ${RESULT}  | jq -r '.datagwCertificateName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_CERTIFICATE_NAME: $AZURE_DATAGW_CERTIFICATE_NAME"
-    AZURE_DATAGW_APP_NAME=$(echo ${RESULT}  | jq -r '.datagwAppName.value' 2>/dev/null)
-    echo "AZURE_DATAGW_APP_NAME: $AZURE_DATAGW_APP_NAME"
 
     AZURE_VPN_GATEWAY_PIP_NAME=$(echo ${RESULT}  | jq -r '.vpnGatewayPublicIpName.value' 2>/dev/null)
     echo "AZURE_VPN_GATEWAY_PIP_NAME: $AZURE_VPN_GATEWAY_PIP_NAME"
     AZURE_DNS_RESOLVER_NAME=$(echo ${RESULT}  | jq -r '.dnsResolverName.value' 2>/dev/null)
     echo "AZURE_DNS_RESOLVER_NAME: $AZURE_DNS_RESOLVER_NAME"
 
-    AZURE_POSTGRESQL_ADMINISTRATOR_LOGIN_SECRET_NAME=$(echo ${RESULT}  | jq -r '.postgreSqlAdministratorLoginSecretName.value' 2>/dev/null)
-    echo "AZURE_POSTGRESQL_ADMINISTRATOR_LOGIN_SECRET_NAME: $AZURE_POSTGRESQL_ADMINISTRATOR_LOGIN_SECRET_NAME"
-    AZURE_POSTGRESQL_ADMINISTRATOR_PASSWORD_SECRET_NAME=$(echo ${RESULT}  | jq -r '.postgreSqlAdministratorPassSecretName.value' 2>/dev/null)
-    echo "AZURE_POSTGRESQL_ADMINISTRATOR_PASSWORD_SECRET_NAME: $AZURE_POSTGRESQL_ADMINISTRATOR_PASSWORD_SECRET_NAME"
-
-    AZURE_RESOURCE_GROUP_FABRIC_NAME=$(echo ${RESULT}  | jq -r '.resourceGroupFabricName.value' 2>/dev/null)
-    echo "AZURE_RESOURCE_GROUP_FABRIC_NAME: $AZURE_RESOURCE_GROUP_FABRIC_NAME"
-    AZURE_RESOURCE_GROUP_DATASOURCE_NAME=$(echo ${RESULT}  | jq -r '.resourceGroupDatasourceName.value' 2>/dev/null)
-    echo "AZURE_RESOURCE_GROUP_DATASOURCE_NAME: $AZURE_RESOURCE_GROUP_DATASOURCE_NAME"
+    AZURE_RESOURCE_GROUP_AZURE_AI_NAME=$(echo ${RESULT}  | jq -r '.resourceGroupAzureAIName.value' 2>/dev/null)
+    echo "AZURE_RESOURCE_GROUP_AZURE_AI_NAME: $AZURE_RESOURCE_GROUP_AZURE_AI_NAME"
 }
 
 
@@ -224,46 +193,24 @@ setAzureResourceNames()
 #  arg 2: Visibility
 #  arg 3: Suffix
 ##############################################################################
-getFabricResourceGroupName()
+getAzureAIResourceGroupName()
 {
     env="$1"
     visibility="$2"
     suffix="$3"
-    if [ ! -z "${AZURE_DEFAULT_FABRIC_RESOURCE_GROUP+x}" ] ; then
-        if [ "${AZURE_DEFAULT_FABRIC_RESOURCE_GROUP}" != "" ] ; then
-            echo "${AZURE_DEFAULT_FABRIC_RESOURCE_GROUP}"
+    if [ ! -z "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP+x}" ] ; then
+        if [ "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP}" != "" ] ; then
+            echo "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP}"
             return
         fi
     fi
     if [ -z "${1+x}" ] ; then
-        echo "rgfabricdevpub"
+        echo "rgazureaidevpub"
     else
-        echo "rgfabric${env}${visibility}${suffix}"
+        echo "rgazureai${env}${visibility}${suffix}"
     fi
 }
-##############################################################################
-#- Get Datasource Resource Group Name
-#  arg 1: Env
-#  arg 2: Visibility
-#  arg 3: Suffix
-##############################################################################
-getDatasourceResourceGroupName()
-{
-    env="$1"
-    visibility="$2"
-    suffix="$3"
-    if [ ! -z "${AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP+x}" ] ; then
-        if [ "${AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP}" != "" ] ; then
-            echo "${AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP}"
-            return
-        fi
-    fi
-    if [ -z "${1+x}" ] ; then
-        echo "rgdatasourcedevpub"
-    else
-        echo "rgdatasource${env}${visibility}${suffix}"
-    fi
-}
+
 ##############################################################################
 #- Get Storage Account Name
 #  arg 1: Env
@@ -397,28 +344,14 @@ getAvailableSuffix() {
     while [ "$FOUND" = "true" ]; do
         SUFFIX=$(shuf -i 1000-9999 -n 1)
 
-        RG=$(getFabricResourceGroupName "${AZURE_ENVIRONMENT}" "pub" "$SUFFIX")
+        RG=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "pub" "$SUFFIX")
         if [ "$(isResourceGroupNameAvailable "$RG")" = "false" ]; then
             FOUND="true"
             continue
         else
             FOUND="false"
         fi
-        RG=$(getFabricResourceGroupName "${AZURE_ENVIRONMENT}" "pri" "$SUFFIX")
-        if [ "$(isResourceGroupNameAvailable "$RG")" = "false" ]; then
-            FOUND="true"
-            continue
-        else
-            FOUND="false"
-        fi
-        RG=$(getDatasourceResourceGroupName "${AZURE_ENVIRONMENT}" "pub"  "$SUFFIX")
-        if [ "$(isResourceGroupNameAvailable "$RG")" = "false" ]; then
-            FOUND="true"
-            continue
-        else
-            FOUND="false"
-        fi
-        RG=$(getDatasourceResourceGroupName "${AZURE_ENVIRONMENT}" "pri"  "$SUFFIX")
+        RG=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "pri" "$SUFFIX")
         if [ "$(isResourceGroupNameAvailable "$RG")" = "false" ]; then
             FOUND="true"
             continue
@@ -524,8 +457,7 @@ AZURE_SUFFIX="${AZURE_SUFFIX}"
 AZURE_SUBSCRIPTION_ID=${CURRENT_SUBSCRIPTION_ID}
 AZURE_TENANT_ID=${CURRENT_TENANT_ID}
 AZURE_ENVIRONMENT=${AZURE_ENVIRONMENT}
-AZURE_DEFAULT_FABRIC_RESOURCE_GROUP=""
-AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP=""
+AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP=""
 EOF
         fi
         readConfigurationFile "$CONFIGURATION_FILE"
@@ -831,6 +763,48 @@ createFabricKeyVaultManagedPrivateEndpoints ()
         az network private-endpoint-connection approve --id $arg 
     done
 }
+##############################################################################
+#- uploadNotebooks
+##############################################################################
+uploadNotebooks ()
+{
+    azureMLworkspaceName="$1"
+    storageAccount="$2"
+    resourceGroup="$3"
+    fileSource="$4"
+    fileDestination="$5"
+
+    printProgress "Getting File Share Name..."
+    FILE_SHARE_NAME=$(az ml datastore list --workspace-name ${azureMLworkspaceName} -g ${resourceGroup} --query "[?name=='workspaceworkingdirectory'].file_share_name" -o tsv)
+    if [ -z "${FILE_SHARE_NAME}" ]; then
+        printError "Cannot get File Share Name 'workspaceworkingdirectory' for Azure Storage Account ${storageAccount}"
+        exit 1
+    fi
+    printProgress "File Share Name: ${FILE_SHARE_NAME}"
+    
+    path="${fileDestination}"
+    current="$(dirname "$path")"
+    while [ "$current" != "." ] && [ -n "$current" ]; do
+        printProgress "Create directory $current"
+        cmd="az storage directory create \
+        --account-name ${storageAccount} \
+        --share-name ${FILE_SHARE_NAME} \
+        --auth-mode login  --enable-file-backup-request-intent \
+        --name $current"
+        printProgress "$cmd"
+        eval "$cmd" 1>/dev/null 2>/dev/null || true
+        current="$(dirname "$current")"
+    done | tac
+
+    printProgress "Uploading notebooks..."
+    cmd="az storage file upload \
+      --auth-mode login \
+      --account-name ${storageAccount} \
+      --share-name ${FILE_SHARE_NAME} \
+      --source ${fileSource} --path ${fileDestination}  --enable-file-backup-request-intent"
+    printProgress "$cmd"
+    eval "$cmd"
+}
 
 
 DEFAULT_ACTION="action not set"
@@ -883,14 +857,10 @@ if [ $# -eq 0 ] || [ -z "${ARG_ACTION}" ] || [ -z "$ARG_CONFIGURATION_FILE" ]; t
 fi
 if [ "${ARG_ACTION}" != "deploy-public-azure-ai" ] && \
    [ "${ARG_ACTION}" != "azure-login" ] && \
-   [ "${ARG_ACTION}" != "deploy-public-datasource" ] && \
    [ "${ARG_ACTION}" != "deploy-private-azure-ai" ] && \
-   [ "${ARG_ACTION}" != "remove-public-datasource" ] && \
    [ "${ARG_ACTION}" != "remove-public-azure-ai" ] && \
-   [ "${ARG_ACTION}" != "remove-private-datasource" ] && \
-   [ "${ARG_ACTION}" != "remove-private-azure-ai" ] && \
-   [ "${ARG_ACTION}" != "deploy-private-datasource" ]; then
-    printError "ACTION '${ARG_ACTION}' not supported, possible values: deploy-public-azure-ai, deploy-public-datasource, deploy-private-azure-ai, deploy-private-datasource "
+   [ "${ARG_ACTION}" != "remove-private-azure-ai" ]; then
+    printError "ACTION '${ARG_ACTION}' not supported, possible values: deploy-public-azure-ai, deploy-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai  "
     usage
     exit 1
 fi
@@ -946,8 +916,7 @@ AZURE_SUFFIX=${AZURE_SUFFIX}
 AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
 AZURE_TENANT_ID=${AZURE_TENANT_ID}
 AZURE_ENVIRONMENT=${AZURE_ENVIRONMENT}
-AZURE_DEFAULT_FABRIC_RESOURCE_GROUP=""
-AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP=""
+AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP=""
 EOF
     fi
     exit 0
@@ -957,10 +926,14 @@ checkAzureConfiguration
 
 
 if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
+    cmd="az config set extension.use_dynamic_install=yes_without_prompt"
+    printProgress "$cmd"
+    eval "$cmd" 1>/dev/null 2>/dev/null || true
+
     printProgress "Checking whether the Azure CLI providers and extensions are installed..."
     installPreRequisites
     VISIBILITY="pub"
-    RESOURCE_GROUP_NAME=$(getFabricResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
+    RESOURCE_GROUP_NAME=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
     if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "false" ]; then
         printProgress "Create resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
         cmd="az group create -l ${AZURE_REGION} -n ${RESOURCE_GROUP_NAME}"
@@ -979,11 +952,6 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
         exit 1
     fi
     OBJECT_TYPE=$(getCurrentObjectType)
-    PRINCIPAL_NAME=$(getCurrentUserPrincipalName)
-    if [ -z "${PRINCIPAL_NAME}" ] || [ "${PRINCIPAL_NAME}" = "null" ]; then
-        printError "Cannot get current user principal name"
-        exit 1
-    fi
     printProgress "Deploy public Fabric in resource group '${RESOURCE_GROUP_NAME}'"
     DEPLOY_NAME=$(date +"%y%m%d%H%M%S")
     cmd="az deployment group create --resource-group $RESOURCE_GROUP_NAME  --name ${DEPLOY_NAME}   \
@@ -993,161 +961,74 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     env=${AZURE_ENVIRONMENT} \
     visibility=${VISIBILITY} \
     suffix=${AZURE_SUFFIX} \
-    fabricSKU=${FABRIC_SKU} \
-    objectId=\"${OBJECT_ID}\" objectType=\"${OBJECT_TYPE}\" principalName=\"${PRINCIPAL_NAME}\"   clientIpAddress=\"${CLIENT_IP_ADDRESS}\"  \
+    objectId=\"${OBJECT_ID}\" objectType=\"${OBJECT_TYPE}\" clientIpAddress=\"${CLIENT_IP_ADDRESS}\"  \
      --verbose"
     printProgress "$cmd"
     eval "$cmd"
     checkError
-
-    if [ -n "${AZURE_FABRIC_WORKSPACE_NAME}" ]; then
-        WORKSPACE_ID=$(getFabricWorkspaceId "${AZURE_FABRIC_WORKSPACE_NAME}")
-        if [ -z "${WORKSPACE_ID}" ]; then
-            printProgress "Creating Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            createFabricWorkspace "${AZURE_FABRIC_WORKSPACE_NAME}"
-            WORKSPACE_ID=$(getFabricWorkspaceId "${AZURE_FABRIC_WORKSPACE_NAME}")
-        fi
-        if [ -z "${WORKSPACE_ID}" ]; then
-            printError "Cannot get Fabric workspace ID for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            exit 1
-        fi
-        printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} id is ${WORKSPACE_ID}"
-        WORKSPACE_IDENTITY=$(getFabricWorkspaceIdentity "${WORKSPACE_ID}")
-        if [ -z "${WORKSPACE_IDENTITY}" ] || [ "${WORKSPACE_IDENTITY}" = "null" ]; then
-            printProgress "Creating Fabric workspace identity for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            RESULT=$(createFabricWorkspaceIdentity "${WORKSPACE_ID}")
-            sleep 10
-            WORKSPACE_IDENTITY=$(getFabricWorkspaceIdentity "${WORKSPACE_ID}")
-        fi
-        if [ -z "${WORKSPACE_IDENTITY}" ] || [ "${WORKSPACE_IDENTITY}" = "null" ]; then
-            printError "Cannot get Fabric workspace identity for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            exit 1
-        fi
-        printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} and id ${WORKSPACE_ID} has identity ${WORKSPACE_IDENTITY}"
-    fi
-    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FABRIC_WORKSPACE_NAME "${AZURE_FABRIC_WORKSPACE_NAME}"
-    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FABRIC_WORKSPACE_ID "${WORKSPACE_ID}"
-    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FABRIC_WORKSPACE_PRINCIPAL_ID "${WORKSPACE_IDENTITY}"
-    exit 0
-fi
-
-if [ "${ACTION}" = "deploy-public-datasource" ] ; then
-    VISIBILITY="pub"
-    installPreRequisites    
-    RESOURCE_GROUP_NAME=$(getDatasourceResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
-    if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "false" ]; then
-        printProgress "Create resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
-        cmd="az group create -l ${AZURE_REGION} -n ${RESOURCE_GROUP_NAME}"
-        printProgress "$cmd"
-        eval "$cmd" 1>/dev/null
-        if [ -z "${AZURE_SUFFIX+x}" ] || [ "${AZURE_SUFFIX}" = "" ]; then
-            SUFFIX=$(shuf -i 1000-9999 -n 1)
-            updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_SUFFIX "${SUFFIX}"
-            AZURE_SUFFIX="${SUFFIX}"
-        fi
-        checkError
-    else
-        printProgress "Resource group '${RESOURCE_GROUP_NAME}' already exists"
-    fi
-    setAzureResourceNames ${AZURE_ENVIRONMENT} "${VISIBILITY}" "${AZURE_SUFFIX}" "${RESOURCE_GROUP_NAME}"
-    if [ -z "${AZURE_FABRIC_WORKSPACE_IDENTITY+x}" ] ; then
-        if [ -n "${AZURE_FABRIC_WORKSPACE_NAME}" ]; then
-            AZURE_FABRIC_WORKSPACE_ID=$(getFabricWorkspaceId "${AZURE_FABRIC_WORKSPACE_NAME}")
-            if [ -z "${AZURE_FABRIC_WORKSPACE_ID}" ]; then
-                printError "Cannot get Fabric workspace ID for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-                exit 1
-            fi
-            printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} id is ${AZURE_FABRIC_WORKSPACE_ID}"
-            AZURE_FABRIC_WORKSPACE_IDENTITY=$(getFabricWorkspaceIdentity "${AZURE_FABRIC_WORKSPACE_ID}")
-            if [ -z "${AZURE_FABRIC_WORKSPACE_IDENTITY}" ] || [ "${AZURE_FABRIC_WORKSPACE_IDENTITY}" = "null" ]; then
-                printError "Cannot get Fabric workspace identity for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-                exit 1
-            fi
-            printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} and id ${AZURE_FABRIC_WORKSPACE_ID} has identity ${AZURE_FABRIC_WORKSPACE_IDENTITY}"
-        fi
-    fi
-
-
-    CLIENT_IP_ADDRESS=$(curl -s https://ifconfig.me)
-    OBJECT_ID=$(getCurrentObjectId)
-    OBJECT_TYPE=$(getCurrentObjectType)
-
-    printProgress "Reading SQL Administrator login from Key Vault  ${AZURE_KEY_VAULT_NAME}"
-    POSTGRESQL_ADMIN_LOGIN=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_LOGIN_SECRET_NAME}")
-    if [ -z "${POSTGRESQL_ADMIN_LOGIN}" ]; then
-        printProgress "Writing SQL Administrator login to Key Vault  ${AZURE_KEY_VAULT_NAME}"
-        POSTGRESQL_ADMIN_LOGIN="${DEFAULT_POSTGRESQL_ADMIN_USERNAME}"
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_LOGIN_SECRET_NAME}" "${POSTGRESQL_ADMIN_LOGIN}"
-    else
-        printProgress "Using existing SQL Administrator login from Key Vault  ${AZURE_KEY_VAULT_NAME}"
-    fi
-    printProgress "Reading PostgreSQL Administrator password from Key Vault  ${AZURE_KEY_VAULT_NAME}"
-    POSTGRESQL_ADMIN_PASSWORD=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_PASSWORD_SECRET_NAME}")
-    if [ -z "${POSTGRESQL_ADMIN_PASSWORD}" ]; then
-        printProgress "Generating and storing PostgreSQL Administrator password in Key Vault  ${AZURE_KEY_VAULT_NAME}"
-        POSTGRESQL_ADMIN_PASSWORD=$(tr -dc 'A-Za-z0-9!?%=' < /dev/urandom | head -c 12)$(tr -dc '[:upper:]' < /dev/urandom  | head -c1)$(tr -dc '[:lower:]' < /dev/urandom  | head -c1)$(tr -dc '0-9' < /dev/urandom  | head -c1)
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_PASSWORD_SECRET_NAME}" "${POSTGRESQL_ADMIN_PASSWORD}"
-    fi
-
-    printProgress "Deploy public datasource in resource group '${RESOURCE_GROUP_NAME}'"
-    DEPLOY_NAME=$(date +"%y%m%d%H%M%S")
-    cmd="az deployment group create --resource-group $RESOURCE_GROUP_NAME \
-    --name "${DEPLOY_NAME}" --template-file $SCRIPTS_DIRECTORY/bicep/public-datasource.bicep \
-    --parameters  \
-    location=${AZURE_REGION} \
-    env=${AZURE_ENVIRONMENT} \
-    visibility=${VISIBILITY} \
-    suffix=${AZURE_SUFFIX} \
-    sqlAdministratorLogin=\"${POSTGRESQL_ADMIN_LOGIN}\" \
-    sqlAdministratorPassword=\"${POSTGRESQL_ADMIN_PASSWORD}\" \
-    fabricPrincipalId=\"${AZURE_FABRIC_WORKSPACE_IDENTITY}\" \
-    objectId=\"${OBJECT_ID}\"  objectType=\"${OBJECT_TYPE}\"  \
-    clientIpAddress=\"${CLIENT_IP_ADDRESS}\"  --verbose"
-    printProgress "$cmd"
-    eval "$cmd"
-    checkError
-
-    printProgress "Upload dataset in storage account '${AZURE_STORAGE_ACCOUNT_NAME}' under container '${AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME}'"
-    cmd="az storage blob upload-batch --account-name ${AZURE_STORAGE_ACCOUNT_NAME} --destination ${AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME} --source $SCRIPTS_DIRECTORY/data/samples --overwrite --auth-mode login"
-    printProgress "$cmd"
-    eval "$cmd"
-
-    SQLCMD_PATH=$(command -v sqlcmd 2>/dev/null)
-    printProgress "Checking if sqlcmd is installed"
-    if [ ! -n "$SQLCMD_PATH" ]; then
-        printProgress "Installing sqlcmd"
-        installSqlcmd
-    fi
-    printProgress "Creating Product table 'Product' in PostgreSQL  database '$AZURE_POSTGRESQL_NAME'"
-    POSTGRESQL_DATABASE="products"
-    cmd="PGPASSWORD=$POSTGRESQL_ADMIN_PASSWORD  \
-        psql \
-            -h \"$AZURE_POSTGRESQL_NAME.postgres.database.azure.com\" \
-            -U \"$POSTGRESQL_ADMIN_LOGIN\" \
-            -d \"postgres\" \
-            -c \"CREATE DATABASE $POSTGRESQL_DATABASE;\""
-    #printProgress "$cmd"
-    eval "$cmd"
-
-    cmd="PGPASSWORD=$POSTGRESQL_ADMIN_PASSWORD  \
-            psql \
-            -h \"$AZURE_POSTGRESQL_NAME.postgres.database.azure.com\" \
-            -U \"$POSTGRESQL_ADMIN_LOGIN\" \
-            -d \"$POSTGRESQL_DATABASE\" \
-            -v ON_ERROR_STOP=1 \
-            -f \"$SCRIPTS_DIRECTORY/data/products/setup.sql\""
     
-    #printProgress "$cmd"
-    eval "$cmd"
+    printProgress "Store secrets in Key Vault"
+    AZURE_ML_MODEL_ID_SECRET_NAME="AZURE-ML-MODEL-ID"
+    AZURE_ML_MODEL_ID_SECRET="facebook/opt-350m" 
+    AZURE_ML_MODEL_NAME_SECRET_NAME="AZURE-ML-MODEL-NAME" 
+    AZURE_ML_MODEL_NAME_SECRET="model_custom" 
+    AZURE_ML_ENDPOINT_NAME_SECRET_NAME="AZURE-ML-ENDPOINT-NAME" 
+    AZURE_ML_ENDPOINT_NAME_SECRET="model-endpoint" 
+    AZURE_ML_ENV_NAME_SECRET_NAME="AZURE-ML-ENV-NAME" 
+    AZURE_ML_ENV_NAME_SECRET="model_env" 
+    AZURE_ML_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-INSTANCE-TYPE" 
+    AZURE_ML_INSTANCE_TYPE_SECRET="Standard_NC4as_T4_v3" 
+    AZURE_ML_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-SCORING-SCRIPT"
+    AZURE_ML_SCORE_SCRIPT_SECRET="score.py" 
+    AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME="AZURE-ML-SUBSCRIPTION-ID" 
+    AZURE_ML_SUBSCRIPTION_ID_SECRET=${AZURE_SUBSCRIPTION_ID} 
+    AZURE_ML_RESOURCE_GROUP_SECRET_NAME="AZURE-ML-RESOURCE-GROUP" 
+    AZURE_ML_RESOURCE_GROUP_SECRET=${AZURE_RESOURCE_GROUP_AZURE_AI_NAME} 
+    AZURE_ML_WORKSPACE_NAME_SECRET_NAME="AZURE-ML-WORKSPACE-NAME"
+    AZURE_ML_WORKSPACE_NAME_SECRET=${AZURE_ML_NAME} 
 
+    printProgress "Updating secrets ${AZURE_ML_MODEL_ID_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_ID_SECRET_NAME} ${AZURE_ML_MODEL_ID_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_MODEL_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_NAME_SECRET_NAME} ${AZURE_ML_MODEL_NAME_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_ENDPOINT_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENDPOINT_NAME_SECRET_NAME} ${AZURE_ML_ENDPOINT_NAME_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_ENV_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENV_NAME_SECRET_NAME} ${AZURE_ML_ENV_NAME_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_INSTANCE_TYPE_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_INSTANCE_TYPE_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_SCORE_SCRIPT_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_SCORE_SCRIPT_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_RESOURCE_GROUP_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET}
+    printProgress "Updating secrets ${AZURE_ML_WORKSPACE_NAME_SECRET_NAME} in Key Vault ${AZURE_KEY_VAULT_NAME} for Azure ML deployment..."
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET}
+
+
+
+    printProgress "Uploading notebooks to Azure Storage ${AZURE_STORAGE_ACCOUNT_NAME} ..."
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/safety-evaluation.ipynb" "Users/shared/safety-evaluation.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-empty.ipynb" "Users/shared/deploy-model-empty.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-opt350m.ipynb" "Users/shared/deploy-model-opt350m.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score.py" "Users/shared/src/score.py"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../.env" "Users/shared/.env"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_ML_NAME "${AZURE_ML_NAME}"
     exit 0
 fi
+
 
 if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
+    cmd="az config set extension.use_dynamic_install=yes_without_prompt"
+    printProgress "$cmd"
+    eval "$cmd" 1>/dev/null 2>/dev/null || true
     printProgress "Checking whether the Azure CLI providers and extensions are installed..."
     installPreRequisites
     VISIBILITY="pri"
-    RESOURCE_GROUP_NAME=$(getFabricResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
+    RESOURCE_GROUP_NAME=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
     if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "false" ]; then
         printProgress "Create resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
         cmd="az group create -l ${AZURE_REGION} -n ${RESOURCE_GROUP_NAME}"
@@ -1171,11 +1052,7 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
         exit 1
     fi    
     OBJECT_TYPE=$(getCurrentObjectType)
-    PRINCIPAL_NAME=$(getCurrentUserPrincipalName)
-    if [ -z "${PRINCIPAL_NAME}" ] || [ "${PRINCIPAL_NAME}" = "null" ]; then
-        printError "Cannot get current user principal name"
-        exit 1
-    fi    
+  
     DEPLOY_NAME=$(date +"%y%m%d%H%M%S")
     cmd="az deployment group create --resource-group $RESOURCE_GROUP_NAME --name ${DEPLOY_NAME} \
     --template-file $SCRIPTS_DIRECTORY/bicep/private-main.bicep \
@@ -1195,288 +1072,22 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     dnsZoneResourceGroupName=\"${RESOURCE_GROUP_NAME}\" \
     dnsZoneSubscriptionId=\"${AZURE_SUBSCRIPTION_ID}\" \
     newOrExistingDnsZones=\"new\" \
-    objectId=\"${OBJECT_ID}\"  objectType=\"${OBJECT_TYPE}\" principalName=\"${PRINCIPAL_NAME}\"  \
+    objectId=\"${OBJECT_ID}\"  objectType=\"${OBJECT_TYPE}\"  \
      --verbose"
     printProgress "$cmd"
     eval "$cmd"
     checkError
 
-    if [ -n "${AZURE_FABRIC_WORKSPACE_NAME}" ]; then
-        WORKSPACE_ID=$(getFabricWorkspaceId "${AZURE_FABRIC_WORKSPACE_NAME}")
-        if [ -z "${WORKSPACE_ID}" ]; then
-            printProgress "Creating Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            createFabricWorkspace "${AZURE_FABRIC_WORKSPACE_NAME}"
-            WORKSPACE_ID=$(getFabricWorkspaceId "${AZURE_FABRIC_WORKSPACE_NAME}")
-        fi
-        if [ -z "${WORKSPACE_ID}" ]; then
-            printError "Cannot get Fabric workspace ID for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            exit 1
-        fi
-        printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} id is ${WORKSPACE_ID}"
-        WORKSPACE_IDENTITY=$(getFabricWorkspaceIdentity "${WORKSPACE_ID}")
-        if [ -z "${WORKSPACE_IDENTITY}" ] || [ "${WORKSPACE_IDENTITY}" = "null" ]; then
-            printProgress "Creating Fabric workspace identity for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            RESULT=$(createFabricWorkspaceIdentity "${WORKSPACE_ID}")
-            sleep 10
-            WORKSPACE_IDENTITY=$(getFabricWorkspaceIdentity "${WORKSPACE_ID}")
-        fi
-        if [ -z "${WORKSPACE_IDENTITY}" ] || [ "${WORKSPACE_IDENTITY}" = "null" ]; then
-            printError "Cannot get Fabric workspace identity for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-            exit 1
-        fi
-        printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} and id ${WORKSPACE_ID} has identity ${WORKSPACE_IDENTITY}"
-    fi
-
-    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FABRIC_WORKSPACE_NAME "${AZURE_FABRIC_WORKSPACE_NAME}"
-    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FABRIC_WORKSPACE_ID "${WORKSPACE_ID}"
-    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FABRIC_WORKSPACE_PRINCIPAL_ID "${WORKSPACE_IDENTITY}"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_ML_NAME "${AZURE_ML_NAME}"
     exit 0
 fi
-
-if [ "${ACTION}" = "deploy-private-datasource" ] ; then
-    installPreRequisites
-    VISIBILITY="pri"
-    RESOURCE_GROUP_NAME=$(getDatasourceResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
-    if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "false" ]; then
-        printProgress "Create resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
-        cmd="az group create -l ${AZURE_REGION} -n ${RESOURCE_GROUP_NAME}"
-        printProgress "$cmd"
-        eval "$cmd" 1>/dev/null
-        if [ -z "${AZURE_SUFFIX+x}" ] || [ "${AZURE_SUFFIX}" = "" ]; then
-            SUFFIX=$(shuf -i 1000-9999 -n 1)
-            updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_SUFFIX "${SUFFIX}"
-            AZURE_SUFFIX="${SUFFIX}"
-        fi
-        checkError
-    else
-        printProgress "Resource group '${RESOURCE_GROUP_NAME}' already exists"
-    fi
-    setAzureResourceNames ${AZURE_ENVIRONMENT} "${VISIBILITY}" "${AZURE_SUFFIX}" "${RESOURCE_GROUP_NAME}"
-    if [ -z "${AZURE_FABRIC_WORKSPACE_IDENTITY+x}" ] ; then
-        if [ -n "${AZURE_FABRIC_WORKSPACE_NAME}" ]; then
-            AZURE_FABRIC_WORKSPACE_ID=$(getFabricWorkspaceId "${AZURE_FABRIC_WORKSPACE_NAME}")
-            if [ -z "${AZURE_FABRIC_WORKSPACE_ID}" ]; then
-                printError "Cannot get Fabric workspace ID for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-                exit 1
-            fi
-            printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} id is ${AZURE_FABRIC_WORKSPACE_ID}"
-            AZURE_FABRIC_WORKSPACE_IDENTITY=$(getFabricWorkspaceIdentity "${AZURE_FABRIC_WORKSPACE_ID}")
-            if [ -z "${AZURE_FABRIC_WORKSPACE_IDENTITY}" ] || [ "${AZURE_FABRIC_WORKSPACE_IDENTITY}" = "null" ]; then
-                printError "Cannot get Fabric workspace identity for workspace name ${AZURE_FABRIC_WORKSPACE_NAME}"
-                exit 1
-            fi
-            printProgress "Fabric workspace with name ${AZURE_FABRIC_WORKSPACE_NAME} and id ${AZURE_FABRIC_WORKSPACE_ID} has identity ${AZURE_FABRIC_WORKSPACE_IDENTITY}"
-        fi
-    fi
-
-    CLIENT_IP_ADDRESS=$(curl -s https://ifconfig.me)
-    OBJECT_ID=$(getCurrentObjectId)
-    OBJECT_TYPE=$(getCurrentObjectType)
-
-    POSTGRESQL_ADMIN_LOGIN=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_LOGIN_SECRET_NAME}")
-    if [ -z "${POSTGRESQL_ADMIN_LOGIN}" ]; then
-        POSTGRESQL_ADMIN_LOGIN="${DEFAULT_POSTGRESQL_ADMIN_USERNAME}"
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_LOGIN_SECRET_NAME}" "${POSTGRESQL_ADMIN_LOGIN}"
-    else
-        printProgress "Using existing PostgreSQL SQL Administrator login from Key Vault  ${AZURE_KEY_VAULT_NAME}"
-    fi
-    POSTGRESQL_ADMIN_PASSWORD=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_PASSWORD_SECRET_NAME}")
-    if [ -z "${POSTGRESQL_ADMIN_PASSWORD}" ]; then
-        printProgress "Generating and storing PostgreSQL SQL Administrator password in Key Vault  ${AZURE_KEY_VAULT_NAME}"
-        POSTGRESQL_ADMIN_PASSWORD=$(tr -dc 'A-Za-z0-9!?%=' < /dev/urandom | head -c 12)$(tr -dc '[:upper:]' < /dev/urandom  | head -c1)$(tr -dc '[:lower:]' < /dev/urandom  | head -c1)$(tr -dc '0-9' < /dev/urandom  | head -c1)
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_POSTGRESQL_ADMINISTRATOR_PASSWORD_SECRET_NAME}" "${POSTGRESQL_ADMIN_PASSWORD}"
-    fi
-
-    FABRIC_RESOURCE_GROUP_NAME=$(getFabricResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
-
-
-    DATAGW_VM_SKU_NAME="Standard_B2ms"
-    DATA_GATEWAY_LOGIN=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_VM_LOGIN_SECRET_NAME}")
-    if [ -z "${DATA_GATEWAY_LOGIN}" ]; then
-        DATA_GATEWAY_LOGIN="${DEFAULT_DATAGW_VM_USERNAME}"
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_VM_LOGIN_SECRET_NAME}" "${DATA_GATEWAY_LOGIN}"
-    else
-        printProgress "Using existing Data Gateway login from Key Vault  ${AZURE_KEY_VAULT_NAME}"
-    fi
-    DATA_GATEWAY_PASSWORD=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_VM_PASSWORD_SECRET_NAME}")
-    if [ -z "${DATA_GATEWAY_PASSWORD}" ]; then
-        printProgress "Generating and storing Data Gateway password in Key Vault  ${AZURE_KEY_VAULT_NAME}"
-        DATA_GATEWAY_PASSWORD=$(tr -dc 'A-Za-z0-9!?%=' < /dev/urandom | head -c 12)$(tr -dc '[:upper:]' < /dev/urandom  | head -c1)$(tr -dc '[:lower:]' < /dev/urandom  | head -c1)$(tr -dc '0-9' < /dev/urandom  | head -c1)
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_VM_PASSWORD_SECRET_NAME}" "${DATA_GATEWAY_PASSWORD}"
-    fi
-    DATA_GATEWAY_RECOVERY_KEY=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_VM_RECOVERY_KEY_SECRET_NAME}")
-    if [ -z "${DATA_GATEWAY_RECOVERY_KEY}" ]; then
-        printProgress "Generating and storing Data Gateway recovery key in Key Vault  ${AZURE_KEY_VAULT_NAME}"
-        DATA_GATEWAY_RECOVERY_KEY=$(tr -dc 'A-Za-z0-9!?%=' < /dev/urandom | head -c 12)$(tr -dc '[:upper:]' < /dev/urandom  | head -c1)$(tr -dc '[:lower:]' < /dev/urandom  | head -c1)$(tr -dc '0-9' < /dev/urandom  | head -c1)
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_VM_RECOVERY_KEY_SECRET_NAME}" "${DATA_GATEWAY_RECOVERY_KEY}"
-    fi
-
-    AZURE_DATAGW_CERTIFICATE_SECRET_NAME
-    AZURE_DATAGW_CERTIFICATE_PASSWORD_SECRET_NAME
-
-    DATA_GATEWAY_CERTIFICATE_PASSWORD=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_CERTIFICATE_PASSWORD_SECRET_NAME}")
-    if [ -z "${DATA_GATEWAY_CERTIFICATE_PASSWORD}" ]; then
-        printProgress "Generating and storing Data Gateway certificate password in Key Vault  ${AZURE_KEY_VAULT_NAME}"
-        DATA_GATEWAY_CERTIFICATE_PASSWORD=$(openssl rand -base64 32)
-        updateSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_CERTIFICATE_PASSWORD_SECRET_NAME}" "${DATA_GATEWAY_CERTIFICATE_PASSWORD}"
-    fi
-
-    DATA_GATEWAY_CERTIFICATE=$(readSecretInKeyVault "${AZURE_KEY_VAULT_NAME}" "${AZURE_DATAGW_CERTIFICATE_SECRET_NAME}")
-    if [ -z "${DATA_GATEWAY_CERTIFICATE}" ]; then
-        printProgress "Generating and storing Data Gateway certificate in Key Vault  ${AZURE_KEY_VAULT_NAME}"
-        DAYS=730
-        # private key
-        printProgress "Creating private key for Data Gateway certificate"
-        openssl genrsa -out ${AZURE_DATAGW_CERTIFICATE_NAME}.key 2048
-        # self-signed certificate
-        printProgress "Creating self-signed certificate for Data Gateway"
-        openssl req -new -x509 \
-        -key ${AZURE_DATAGW_CERTIFICATE_NAME}.key \
-        -out ${AZURE_DATAGW_CERTIFICATE_NAME}.crt \
-        -days $DAYS \
-        -subj "/CN=${AZURE_DATAGW_CERTIFICATE_NAME}"
-        printProgress "Creating pfx file for Data Gateway certificate"
-        openssl pkcs12 -export \
-        -out ${AZURE_DATAGW_CERTIFICATE_NAME}.pfx \
-        -inkey ${AZURE_DATAGW_CERTIFICATE_NAME}.key \
-        -in ${AZURE_DATAGW_CERTIFICATE_NAME}.crt \
-        -password pass:$DATA_GATEWAY_CERTIFICATE_PASSWORD
-        printProgress "Importing pfx file for Data Gateway certificate in key vault ${AZURE_KEY_VAULT_NAME}"
-        az keyvault certificate import \
-        --vault-name ${AZURE_KEY_VAULT_NAME} \
-        --name ${AZURE_DATAGW_CERTIFICATE_SECRET_NAME} \
-        --file ${AZURE_DATAGW_CERTIFICATE_NAME}.pfx \
-        --password $DATA_GATEWAY_CERTIFICATE_PASSWORD
-    fi
-
-    APP_ID=$(az ad app list --display-name ${AZURE_DATAGW_APP_NAME}  --all --query [0].appId -o tsv)
-    if [ -z "${APP_ID}" ]; then
-        printProgress "Creating application for Data Gateway"
-        APP_ID=$(az ad app create \
-        --display-name $AZURE_DATAGW_APP_NAME \
-        --query appId -o tsv)
-        printProgress "Associating application for Data Gateway with certificate ${AZURE_DATAGW_CERTIFICATE_NAME}.crt"
-        az ad app credential reset \
-        --id $APP_ID \
-        --cert @${AZURE_DATAGW_CERTIFICATE_NAME}.crt
-
-        printProgress "Add permission to use Power BI application for Data Gateway"
-        POWERBI_APP_ID=00000009-0000-0000-c000-000000000000
-        az ad app permission add \
-        --id $APP_ID \
-        --api $POWERBI_APP_ID \
-        --api-permissions \
-            654b31ae-d941-4e22-8798-7add8fdf049f=Role \
-            28379fa9-8596-4fd9-869e-cb60a93b5d84=Role
-
-        printProgress "Create admin consent for application"
-        # az ad app permission grant --id $APP_ID --api $POWERBI_APP_ID
-        az ad app permission admin-consent --id $APP_ID
-    fi
-
-    printProgress "Deploy private datasource in resource group '${RESOURCE_GROUP_NAME}'"
-    cmd="az deployment group create --resource-group $RESOURCE_GROUP_NAME \
-    --template-file $SCRIPTS_DIRECTORY/bicep/private-datasource.bicep \
-    --parameters  \
-    location=${AZURE_REGION} \
-    env=${AZURE_ENVIRONMENT} \
-    visibility=${VISIBILITY} \
-    suffix=${AZURE_SUFFIX} \
-    dnsZoneSubscriptionId=\"${AZURE_SUBSCRIPTION_ID}\" \
-    newOrExistingDnsZones=\"existing\" \
-    dnsZoneResourceGroupName=\"${FABRIC_RESOURCE_GROUP_NAME}\" \
-    sqlAdministratorLogin=\"${POSTGRESQL_ADMIN_LOGIN}\" \
-    sqlAdministratorPassword=\"${POSTGRESQL_ADMIN_PASSWORD}\" \
-    vmSkuName=\"${DATAGW_VM_SKU_NAME}\" \
-    administratorUsername=\"${DATA_GATEWAY_LOGIN}\" \
-    administratorPassword=\"${DATA_GATEWAY_PASSWORD}\" \
-    recoveryKey=\"${DATA_GATEWAY_RECOVERY_KEY}\" \
-    fabricPrincipalId=\"${AZURE_FABRIC_WORKSPACE_IDENTITY}\" \
-    objectId=\"${OBJECT_ID}\"  objectType=\"${OBJECT_TYPE}\"  \
-    clientIpAddress=\"${CLIENT_IP_ADDRESS}\"  --verbose"
-    printProgress "$cmd"
-    eval "$cmd"
-    checkError
-
-    printProgress "Updating storage account '${AZURE_STORAGE_ACCOUNT_NAME}'  firewall configuration to allow access from all networks"
-    # cmd="az storage account update  --default-action Allow --resource-group "${RESOURCE_GROUP_NAME}" --name "${AZURE_STORAGE_ACCOUNT_NAME}""
-    cmd="az storage account update \
-    --name ${AZURE_STORAGE_ACCOUNT_NAME} \
-    --resource-group ${RESOURCE_GROUP_NAME} \
-    --public-network-access Enabled"
-
-    printProgress "$cmd"
-    eval "$cmd" >/dev/null
-    sleep 30
-
-    printProgress "Upload dataset in storage account '${AZURE_STORAGE_ACCOUNT_NAME}' under container '${AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME}'"
-    cmd="az storage blob upload-batch --account-name ${AZURE_STORAGE_ACCOUNT_NAME} --destination ${AZURE_STORAGE_ACCOUNT_DEFAULT_CONTAINER_NAME} --source $SCRIPTS_DIRECTORY/data/samples --overwrite --auth-mode login"
-    printProgress "$cmd"
-    eval "$cmd"
-
-    printProgress "Updating storage account '${AZURE_STORAGE_ACCOUNT_NAME}'  firewall configuration to block access from all networks"
-    cmd="az storage account update \
-    --name ${AZURE_STORAGE_ACCOUNT_NAME} \
-    --resource-group ${RESOURCE_GROUP_NAME} \
-    --public-network-access Disabled"
-    printProgress "$cmd"
-    eval "$cmd" >/dev/null
-    sleep 30
-
-    printProgress "Creating Product table 'Product' in PostgreSQL  database '$AZURE_POSTGRESQL_NAME'"
-    POSTGRESQL_DATABASE="products"
-    cmd="PGPASSWORD=$POSTGRESQL_ADMIN_PASSWORD  \
-        psql \
-            -h \"$AZURE_POSTGRESQL_NAME.postgres.database.azure.com\" \
-            -U \"$POSTGRESQL_ADMIN_LOGIN\" \
-            -d \"postgres\" \
-            -c \"CREATE DATABASE $POSTGRESQL_DATABASE;\""
-    #printProgress "$cmd"
-    eval "$cmd"
-
-    cmd="PGPASSWORD=$POSTGRESQL_ADMIN_PASSWORD  \
-            psql \
-            -h \"$AZURE_POSTGRESQL_NAME.postgres.database.azure.com\" \
-            -U \"$POSTGRESQL_ADMIN_LOGIN\" \
-            -d \"$POSTGRESQL_DATABASE\" \
-            -v ON_ERROR_STOP=1 \
-            -f \"$SCRIPTS_DIRECTORY/data/products/setup.sql\""
-    
-    #printProgress "$cmd"
-    eval "$cmd"
-
-
-    
-    printProgress "Creating Managed Private Endpoints for Fabric Workspace ${AZURE_FABRIC_WORKSPACE_NAME}"
-    createFabricKeyVaultManagedPrivateEndpoints "${AZURE_FABRIC_WORKSPACE_NAME}" "${AZURE_RESOURCE_GROUP_FABRIC_NAME}" "${AZURE_KEY_VAULT_NAME}"
-    createFabricStorageManagedPrivateEndpoints "${AZURE_FABRIC_WORKSPACE_NAME}" "${AZURE_RESOURCE_GROUP_DATASOURCE_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" 
-    createFabricPostgreSQLManagedPrivateEndpoints "${AZURE_FABRIC_WORKSPACE_NAME}" "${AZURE_RESOURCE_GROUP_DATASOURCE_NAME}" "${AZURE_POSTGRESQL_NAME}"
-    createFabricCosmosDBManagedPrivateEndpoints "${AZURE_FABRIC_WORKSPACE_NAME}" "${AZURE_RESOURCE_GROUP_DATASOURCE_NAME}" "${AZURE_COSMOS_DB_NAME}"
-    
-    exit 0
-fi
-
-
 
 
 if [ "${ACTION}" = "remove-public-azure-ai" ] ; then
     VISIBILITY="pub"
-    RESOURCE_GROUP_NAME=$(getFabricResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
-    if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "true" ]; then
-        printProgress "Remove resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
-        cmd="az group delete  -n ${RESOURCE_GROUP_NAME} -y"
-        printProgress "$cmd"
-        eval "$cmd" 1>/dev/null
-        checkError
-    else
-        printProgress "Resource group '${RESOURCE_GROUP_NAME}' doesn't exists"
-    fi
-    exit 0
-fi
-
-if [ "${ACTION}" = "remove-public-datasource" ] ; then
-    VISIBILITY="pub"
-    RESOURCE_GROUP_NAME=$(getDatasourceResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
+    RESOURCE_GROUP_NAME=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
     if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "true" ]; then
         printProgress "Remove resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
         cmd="az group delete  -n ${RESOURCE_GROUP_NAME} -y"
@@ -1491,7 +1102,7 @@ fi
 
 if [ "${ACTION}" = "remove-private-azure-ai" ] ; then
     VISIBILITY="pri"
-    RESOURCE_GROUP_NAME=$(getFabricResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
+    RESOURCE_GROUP_NAME=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
     if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "true" ]; then
         printProgress "Remove resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
         cmd="az group delete  -n ${RESOURCE_GROUP_NAME} -y"
@@ -1504,17 +1115,3 @@ if [ "${ACTION}" = "remove-private-azure-ai" ] ; then
     exit 0
 fi
 
-if [ "${ACTION}" = "remove-private-datasource" ] ; then
-    VISIBILITY="pri"
-    RESOURCE_GROUP_NAME=$(getDatasourceResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
-    if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "true" ]; then
-        printProgress "Remove resource group  '${RESOURCE_GROUP_NAME}' in location '${AZURE_REGION}'"
-        cmd="az group delete  -n ${RESOURCE_GROUP_NAME} -y"
-        printProgress "$cmd"
-        eval "$cmd" 1>/dev/null
-        checkError
-    else
-        printProgress "Resource group '${RESOURCE_GROUP_NAME}' doesn't exists"
-    fi
-    exit 0
-fi

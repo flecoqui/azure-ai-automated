@@ -93,6 +93,10 @@ module azmlModule 'public-azml.bicep' = {
   params: {
     location: location
     azureMLName: namingModule.outputs.azureMLName
+    computeInstanceName: namingModule.outputs.azureMLComputeInstanceName
+    computeInstanceCPUSize: namingModule.outputs.azureMLComputeCPUSize
+    computeInstanceGPUSize: namingModule.outputs.azureMLComputeGPUSize
+    objectId: objectId   
     acrId: containerRegistryModule.outputs.outAcrId
     appInsightsId: appInsightsModule.outputs.outAppInsightsId
     storageId: storageModule.outputs.outStorageAccountId
@@ -107,10 +111,7 @@ module foundryModule 'public-foundry.bicep' = {
   params: {
     location: location
     foundryName: namingModule.outputs.foundryName
-    acrId: containerRegistryModule.outputs.outAcrId
-    appInsightsId: appInsightsModule.outputs.outAppInsightsId
-    storageId: storageModule.outputs.outStorageAccountId
-    keyVaultId: keyVaultModule.outputs.outKeyVaultId
+    foundryProjectName: namingModule.outputs.foundryProjectName
     tags: tags
   }
 }

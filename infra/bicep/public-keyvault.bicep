@@ -35,7 +35,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2021-10-01' = {
     enableSoftDelete: true
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: 'Deny'
+      defaultAction: 'Allow'
       ipRules: [{
           value: clientIpAddress
         }]

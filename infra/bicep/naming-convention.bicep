@@ -14,7 +14,11 @@ param suffix string = '0000'
 var baseName = toLower('${environment}${visibility}${suffix}')
 
 output azureMLName string = 'azml${baseName}'
+output azureMLComputeInstanceName string = 'ci${baseName}'
+output azureMLComputeGPUSize string = 'Standard_NC4as_T4_v3'
+output azureMLComputeCPUSize string = 'Standard_DS11_v2'
 output foundryName string = 'foundry${baseName}'
+output foundryProjectName string = 'foundryproject${baseName}'
 output acrName string = 'acr${baseName}'
 output appInsightsName string = 'appi${baseName}'
 output vnetName string = 'vnet${baseName}'

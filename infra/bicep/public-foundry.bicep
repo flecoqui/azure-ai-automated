@@ -4,17 +4,8 @@ param location string = resourceGroup().location
 @description('Name of the Microsoft Foundry.')
 param foundryName string
 
-@description('The resource ID of the Azure Container Registry.')
-param acrId string
-
-@description('The resource ID of the Application Insights instance.')
-param appInsightsId string
-
-@description('The resource ID of the storage account for Azure ML.')
-param storageId string
-
-@description('Resource ID of the Azure Key Vault.')
-param keyVaultId string
+@description('Name of the Microsoft Foundry Project.')
+param foundryProjectName string
 
 @description('The tags to be applied to the provisioned resources.')
 param tags object
@@ -39,6 +30,7 @@ resource aiFoundry 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     customSubDomainName: foundryName
 
     disableLocalAuth: false
+    publicNetworkAccess: 'Enabled'
   }
   tags: tags
 }
@@ -49,7 +41,7 @@ resource aiFoundry 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   Projects may be granted individual RBAC permissions and identities on top of what account provides.
 */ 
 resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
-  name: '${foundryName}-project'
+  name: foundryProjectName
   parent: aiFoundry
   location: location
   identity: {
