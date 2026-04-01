@@ -86,6 +86,8 @@ output projectId string = aiProject.id
 output modelDeploymentName string = modelDeployment.name  
 output modelDeploymentId string = modelDeployment.id
 output modelDeploymentUri string = aiFoundry.properties.endpoint
-output modelDeploymentKey string = listKeys(aiFoundry.id, aiFoundry.apiVersion).key1
-output modelDeploymentModelApiVersion string = modelDeployment.properties.model.versionoutput 
+// If keys are enabled on the Foundry account, they will be output here.
+// output modelDeploymentKey string = listKeys(aiFoundry.id, aiFoundry.apiVersion).key1
+output modelDeploymentKey string = ''
+output modelDeploymentModelApiVersion string = modelDeployment.properties.model.version 
 output modelDeploymentModelName string = modelDeployment.properties.model.name

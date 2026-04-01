@@ -124,8 +124,11 @@ updateConfigurationFile(){
     printProgress "${variable}=${value}"
 }
 ##############################################################################
-#- Get Public Fabric Resource Group Name
-#  arg 1: Resource Group Suffix
+#- Read deployment outputs from naming-convention Bicep template
+#  arg 1: env
+#  arg 2: visibility
+#  arg 3: Suffix
+#  arg 4: Resource Group Name
 ##############################################################################
 setAzureResourceNames()
 {
@@ -185,18 +188,35 @@ setAzureResourceNames()
     AZURE_RESOURCE_GROUP_AZURE_AI_NAME=$(echo ${RESULT}  | jq -r '.resourceGroupAzureAIName.value' 2>/dev/null)
     echo "AZURE_RESOURCE_GROUP_AZURE_AI_NAME: $AZURE_RESOURCE_GROUP_AZURE_AI_NAME"
 
-    AZURE_MODEL_DEPLOYMENT_NAME=$(echo ${RESULT}  | jq -r '.outModelDeploymentName.value' 2>/dev/null)
-    echo "AZURE_MODEL_DEPLOYMENT_NAME: $AZURE_MODEL_DEPLOYMENT_NAME"
-    AZURE_MODEL_DEPLOYMENT_URI=$(echo ${RESULT}  | jq -r '.outModelDeploymentUri.value' 2>/dev/null)
-    echo "AZURE_MODEL_DEPLOYMENT_URI: $AZURE_MODEL_DEPLOYMENT_URI"
-    AZURE_MODEL_DEPLOYMENT_KEY=$(echo ${RESULT}  | jq -r '.outModelDeploymentKey.value' 2>/dev/null)
-    echo "AZURE_MODEL_DEPLOYMENT_KEY: $AZURE_MODEL_DEPLOYMENT_KEY"
-    AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION=$(echo ${RESULT}  | jq -r '.outModelDeploymentModelApiVersion.value' 2>/dev/null)
-    echo "AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION: $AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION"
-    AZURE_MODEL_DEPLOYMENT_MODEL_NAME=$(echo ${RESULT}  | jq -r '.outModelDeploymentModelName.value' 2>/dev/null)
-    echo "AZURE_MODEL_DEPLOYMENT_MODEL_NAME: $AZURE_MODEL_DEPLOYMENT_MODEL_NAME"
 }
 
+##############################################################################
+#- Read deployment outputs from Bicep template
+#  arg 1: Deployment Name
+#  arg 2: Resource Group Name
+##############################################################################
+readDeploymentOutputs()
+{
+    deployname="$1"
+    RG="$2"
+
+    cmd="az deployment group show --name \"${deployname}\" --resource-group \"${RG}\" --query properties.outputs"
+    #printProgress "$cmd"
+    RESULT=$(eval "$cmd")
+    checkError
+    printProgress "RESULT: $RESULT"
+
+    AZURE_MODEL_DEPLOYMENT_NAME=$(echo ${RESULT}  | jq -r '.modelDeploymentName.value' 2>/dev/null)
+    echo "AZURE_MODEL_DEPLOYMENT_NAME: $AZURE_MODEL_DEPLOYMENT_NAME"
+    AZURE_MODEL_DEPLOYMENT_URI=$(echo ${RESULT}  | jq -r '.modelDeploymentUri.value' 2>/dev/null)
+    echo "AZURE_MODEL_DEPLOYMENT_URI: $AZURE_MODEL_DEPLOYMENT_URI"
+    AZURE_MODEL_DEPLOYMENT_KEY=$(echo ${RESULT}  | jq -r '.modelDeploymentKey.value' 2>/dev/null)
+    echo "AZURE_MODEL_DEPLOYMENT_KEY: $AZURE_MODEL_DEPLOYMENT_KEY"
+    AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION=$(echo ${RESULT}  | jq -r '.modelDeploymentModelApiVersion.value' 2>/dev/null)
+    echo "AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION: $AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION"
+    AZURE_MODEL_DEPLOYMENT_MODEL_NAME=$(echo ${RESULT}  | jq -r '.modelDeploymentModelName.value' 2>/dev/null)
+    echo "AZURE_MODEL_DEPLOYMENT_MODEL_NAME: $AZURE_MODEL_DEPLOYMENT_MODEL_NAME"
+}
 
 ##############################################################################
 #- Get Fabric Resource Group Name
@@ -921,7 +941,8 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     printProgress "$cmd"
     eval "$cmd"
     checkError
-    
+    readDeploymentOutputs ${DEPLOY_NAME} ${RESOURCE_GROUP_NAME}
+
     printProgress "Store secrets in Key Vault"
     AZURE_ML_MODEL_EMPTY_ID_SECRET_NAME="AZURE-ML-MODEL-EMPTY-ID"
     AZURE_ML_MODEL_EMPTY_ID_SECRET="Qwen/Qwen2-1.5B" 
@@ -994,13 +1015,22 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET_NAME="AZURE-ML-MODEL-DEPLOYMENT-MODEL-API-VERSION" 
     AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET="${AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION}"
     AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET_NAME="AZURE-ML-MODEL-DEPLOYMENT-MODEL-NAME" 
-    AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET="${AZURE_MODEL_DEPLOYMENT_MODEL_NAME}" 
+    AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET="${AZURE_MODEL_DEPLOYMENT_MODEL_NAME}"
+
+    AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET_NAME="AZURE-FOUNDRY-PROJECT-ENDPOINT"
+    AZURE_FOUNDRY_PROJECT_ENDPOINT=$(az cognitiveservices account project show -n ${AZURE_FOUNDRY_NAME} --project-name ${AZURE_FOUNDRY_PROJECT_NAME} -g ${RESOURCE_GROUP_NAME} --query properties.endpoints -o tsv)
+    AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET="${AZURE_FOUNDRY_PROJECT_ENDPOINT}"
 
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_NAME_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_NAME_SECRET} true
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_URI_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_URI_SECRET} true
-    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET} true
+    if [ -n "${AZURE_MODEL_DEPLOYMENT_KEY_SECRET}" ] && [ "${AZURE_MODEL_DEPLOYMENT_KEY_SECRET}" != "null" ] && [ "${AZURE_MODEL_DEPLOYMENT_KEY_SECRET}" != "" ]; then
+        updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET} true
+    else
+        updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET_NAME} "null" true
+    fi
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET} true
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET} true    
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET_NAME} ${AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET} true
     
     printProgress "Uploading notebooks to Azure Storage ${AZURE_STORAGE_ACCOUNT_NAME} ..."
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-empty.ipynb" "Users/shared/deploy-model-empty.ipynb"
@@ -1009,6 +1039,7 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-opt350m.ipynb" "Users/shared/evaluation-model-opt350m.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-qwen2-15b.ipynb" "Users/shared/deploy-model-qwen2-15b.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-qwen2-15b.ipynb" "Users/shared/evaluation-model-qwen2-15b.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-open-ai.ipynb" "Users/shared/evaluation-model-open-ai.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-empty.py" "Users/shared/src/score-empty.py"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-opt350m.py" "Users/shared/src/score-opt350m.py"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-qwen2-15b.py" "Users/shared/src/score-qwen2-15b.py"
@@ -1042,7 +1073,7 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
         printProgress "Resource group '${RESOURCE_GROUP_NAME}' already exists"
     fi
     setAzureResourceNames ${AZURE_ENVIRONMENT} "${VISIBILITY}" "${AZURE_SUFFIX}" "${RESOURCE_GROUP_NAME}"
-    printProgress "Deploy private Fabric in resource group '${RESOURCE_GROUP_NAME}'"
+    printProgress "Deploy private azure ML and foundry in resource group '${RESOURCE_GROUP_NAME}'"
 
     OBJECT_ID=$(getCurrentObjectId)
     if [ -z "${OBJECT_ID}" ] || [ "${OBJECT_ID}" = "null" ]; then
@@ -1075,6 +1106,7 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     printProgress "$cmd"
     eval "$cmd"
     checkError
+    readDeploymentOutputs ${DEPLOY_NAME} ${RESOURCE_GROUP_NAME}
 
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"
