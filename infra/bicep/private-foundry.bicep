@@ -1,8 +1,18 @@
 @description('The Azure region for the specified resources.')
 param location string = resourceGroup().location
 
+@description('The base name to be appended to all provisioned resources.')
+@maxLength(13)
+param baseName string
+
 @description('Name of the Microsoft Foundry.')
 param foundryName string
+
+@description('The name of the virtual network for virtual network integration.')
+param vnetName string
+
+@description('The name of the virtual network subnet to be used for private endpoints.')
+param subnetName string
 
 @description('The resource ID of the Azure Container Registry.')
 param acrId string
@@ -16,6 +26,12 @@ param storageId string
 @description('Resource ID of the Azure Key Vault.')
 param keyVaultId string
 
+@description('The Private DNS Zone id for the Cognitive Services private endpoint.')
+param cognitiveServicesPrivateDnsZoneId string
+
+@description('The Private DNS Zone id for the OpenAI private endpoint.')
+param openAiPrivateDnsZoneId string
+
 @description('The user object Id of the user or service principal running the script.')
 param objectId string = ''
 
@@ -24,6 +40,8 @@ param objectType string = 'User'
 
 @description('The tags to be applied to the provisioned resources.')
 param tags object
+
+var privateSubnetId = '${resourceId('Microsoft.Network/virtualNetworks', vnetName)}/subnets/${subnetName}'
 
 /*
   An AI Foundry resources is a variant of a CognitiveServices/account resource type
@@ -45,6 +63,7 @@ resource aiFoundry 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     customSubDomainName: foundryName
 
     disableLocalAuth: false
+    publicNetworkAccess: 'Disabled'
   }
   tags: tags
 }
@@ -83,6 +102,47 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
     }
   }
   tags: tags
+}
+
+resource foundryPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' = {
+  name: 'pe-foundry-${baseName}'
+  location: location
+  properties: {
+    subnet: {
+      id: privateSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'plsc-foundry-${baseName}'
+        properties: {
+          privateLinkServiceId: aiFoundry.id
+          groupIds: [
+            'account'
+          ]
+        }
+      }
+    ]
+  }
+
+  resource foundryPrivateDnsZoneGroup 'privateDnsZoneGroups' = {
+    name: 'foundryPrivateDnsZoneGroup'
+    properties: {
+      privateDnsZoneConfigs: [
+        {
+          name: 'cognitiveservices'
+          properties: {
+            privateDnsZoneId: cognitiveServicesPrivateDnsZoneId
+          }
+        }
+        {
+          name: 'openai'
+          properties: {
+            privateDnsZoneId: openAiPrivateDnsZoneId
+          }
+        }
+      ]
+    }
+  }
 }
 
 // The role definition ID for the Cognitive Services OpenAI User role, which is required to use the Foundry account.

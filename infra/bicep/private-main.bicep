@@ -81,6 +81,10 @@ var privateDnsNames = [
   'privatelink.vaultcore.azure.net'
   'privatelink.blob.${environment().suffixes.storage}'
   'privatelink.azurecr.io'
+  'privatelink.api.azureml.ms'
+  'privatelink.notebooks.azure.net'
+  'privatelink.cognitiveservices.azure.com'
+  'privatelink.openai.azure.com'
 ]
 
 // Defining Private DNS Zones resource group and subscription id
@@ -91,6 +95,10 @@ var calcDnsZoneSubscriptionId = (newOrExistingDnsZones == 'new') ? subscription(
 var blobPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.blob.${environment().suffixes.storage}')
 var acrPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.azurecr.io')
 var keyVaultPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')
+var azmlApiPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.api.azureml.ms')
+var azmlNotebooksPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.notebooks.azure.net')
+var cognitiveServicesPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.cognitiveservices.azure.com')
+var openAiPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.openai.azure.com')
 
 module dnsZoneModule './private-dns-zones.bicep' = if (newOrExistingDnsZones == 'new') {
   name: 'dnsZoneDeploy'
@@ -178,9 +186,17 @@ module containerRegistryModule 'private-acr.bicep' = {
   scope: resourceGroup()
   params: {
     location: location
+    baseName: baseName
     acrName: namingModule.outputs.acrName
+    vnetName: networkModule.outputs.outVnetName
+    subnetName: networkModule.outputs.outPrivateEndpointSubnetName
+    vnetResourceGroupName: calcDnsZoneResourceGroupName
+    acrPrivateDnsZoneId: acrPrivateDnsZoneId
     tags: tags
   }
+  dependsOn: [
+    privateDnsZoneVnetLinkModule
+  ]
 }
 
 
@@ -199,13 +215,21 @@ module azmlModule 'private-azml.bicep' = {
   scope: resourceGroup()
   params: {
     location: location
+    baseName: baseName
     azureMLName: namingModule.outputs.azureMLName
     acrId: containerRegistryModule.outputs.outAcrId
     appInsightsId: appInsightsModule.outputs.outAppInsightsId
     storageId: storageModule.outputs.outStorageAccountId
     keyVaultId: keyVaultModule.outputs.outKeyVaultId
+    vnetName: networkModule.outputs.outVnetName
+    subnetName: networkModule.outputs.outPrivateEndpointSubnetName
+    azmlApiPrivateDnsZoneId: azmlApiPrivateDnsZoneId
+    azmlNotebooksPrivateDnsZoneId: azmlNotebooksPrivateDnsZoneId
     tags: tags
   }
+  dependsOn: [
+    privateDnsZoneVnetLinkModule
+  ]
 }
 
 module foundryModule 'private-foundry.bicep' = {
@@ -213,15 +237,23 @@ module foundryModule 'private-foundry.bicep' = {
   scope: resourceGroup()
   params: {
     location: location
+    baseName: baseName
     foundryName: namingModule.outputs.foundryName
     acrId: containerRegistryModule.outputs.outAcrId
     appInsightsId: appInsightsModule.outputs.outAppInsightsId
     storageId: storageModule.outputs.outStorageAccountId
     keyVaultId: keyVaultModule.outputs.outKeyVaultId
+    vnetName: networkModule.outputs.outVnetName
+    subnetName: networkModule.outputs.outPrivateEndpointSubnetName
+    cognitiveServicesPrivateDnsZoneId: cognitiveServicesPrivateDnsZoneId
+    openAiPrivateDnsZoneId: openAiPrivateDnsZoneId
     objectId: objectId
     objectType: objectType    
     tags: tags
   }
+  dependsOn: [
+    privateDnsZoneVnetLinkModule
+  ]
 }
 
 output outVirtualNetworkName string = networkModule.outputs.outVnetName
