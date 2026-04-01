@@ -151,7 +151,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     ```
 
     After this step, the variables AZURE_REGION, AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID and AZURE_ENVIRONMENT used for the deployment are stored in the file ./.config/.default.env.
-    The variable AZURE_DEFAULT_FABRIC_RESOURCE_GROUP and AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP are by default empty string.
+    The variable AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP is by default empty string.
     By default the name of the Microsoft Foundry and Azure Machine Learning resource group will be 'rgpurview[AZURE_ENVIRONMENT][visibility][AZURE_SUFFIX]'
     the name of the Datasource resource group will be 'rgdatasource[AZURE_ENVIRONMENT][visibility][AZURE_SUFFIX]'
     where [visibility] value is 'pri' for private deployment and 'pub' for public deployment.
@@ -163,20 +163,18 @@ Usually this step is not required in a pipeline as the connection with Azure is 
         AZURE_SUBSCRIPTION_ID=to-be-updated
         AZURE_TENANT_ID=to-be-updated
         AZURE_ENVIRONMENT=dev
-        AZURE_DEFAULT_FABRIC_RESOURCE_GROUP=""
-        AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP=""
+        AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP=""
     ```
 
     In order to deploy the infrastructure with the script 'deploy-infra.sh ', you need to be connected to Azure with sufficient privileges to assign roles to Azure Key Vault and Azure Storage Accounts.
     Instead of using an interactive authentication session with Azure using your Azure account, you can use a service principal connection.
 
-    If you don't have enough permission to create the resource groups for this deployment and you must reuse existing resource groups, you can set the values AZURE_DEFAULT_FABRIC_RESOURCE_GROUP, AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP in file ./.config/.default.env.
+    If you don't have enough permission to create the resource groups for this deployment and you must reuse existing resource groups, you can set the value AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP in file ./.config/.default.env.
 
     For instance:
 
     ```bash
-        AZURE_DEFAULT_FABRIC_RESOURCE_GROUP="fabric-test-rg"
-        AZURE_DEFAULT_DATASOURCE_RESOURCE_GROUP="fabric-test-rg"
+        AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP="foundry-test-rg"
     ```
 
     If you don't have enough permission to deploy some resources in your subscription and you must reuse existing resources like Microsoft Foundry and Azure Machine Learning, you can change the file [naming-convention.bicep](./bicep/naming-convention.bicep) to set the name of some resources.
@@ -198,15 +196,20 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 
         var baseName = toLower('${environment}${visibility}${suffix}')
 
-        output fabricAccountName string = 'fabric${baseName}'
-        output fabricWorkspaceName string = 'workspace${baseName}'
+        output azureMLName string = 'azml${baseName}'
+        output azureMLComputeInstanceName string = 'ci${baseName}'
+        output azureMLComputeGPUSize string = 'Standard_NC4as_T4_v3'
+        output azureMLComputeCPUSize string = 'Standard_DS11_v2'
+        output foundryName string = 'foundry${baseName}'
+        output foundryProjectName string = 'foundryproject${baseName}'
+        output acrName string = 'acr${baseName}'
+        output appInsightsName string = 'appi${baseName}'
         output vnetName string = 'vnet${baseName}'
         output storageAccountName string = 'st${baseName}'
         output storageAccountDefaultContainerName string = 'test${baseName}'
         output keyVaultName string = 'kv${baseName}'
         output privateEndpointSubnetName string = 'snet${baseName}pe'
         output datagwSubnetName string = 'snet${baseName}dtgw'
-        output datagwVMSSName string = 'vm${baseName}'
         output vpnGatewayName string = 'vnetvpngateway${baseName}'
         output vpnGatewayPublicIpName string = 'vnetvpngatewaypip${baseName}'
         output dnsResolverName string = 'vnetdnsresolver${baseName}'
@@ -216,16 +219,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
         output gatewaySubnetName string = 'GatewaySubnet'
         output dnsDelegationSubNetName string = 'DNSDelegationSubnet'
         output baseName string = baseName
-        output postgreSqlServerName string = 'postgre${baseName}'
-        output postgreSqlAdministratorLoginSecretName string = 'POSTGRE-SQL-LOGIN'
-        output postgreSqlAdministratorPassSecretName string = 'POSTGRE-SQL-PASSWORD'
-        type SqlSku = 'Standard_D2ds_v4' | 'Standard_D4ds_v4' 
-        output postgreSqlSku SqlSku = 'Standard_D2ds_v4'
-        type sqlVersion = '11' | '12' | '13' | '14' | '15' | '16' | '17' | '18'
-        output postgreSqlVersion sqlVersion = '13'
-        output cosmosDBName string = 'cosmos${baseName}'
-        output resourceGroupFabricName string = 'rgfabric${baseName}'
-        output resourceGroupDatasourceName string = 'rgdatasource${baseName}'
+        output resourceGroupAzureAIName string = 'rgazureai${baseName}'
     ```
 
 #### Deploying Microsoft Foundry and Azure Machine Learning with public endpoint
@@ -256,21 +250,40 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     AZURE_ENVIRONMENT defines the environment 'dev', 'stag', 'prod',...
 
 
-2. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, you can now deploy a datasources (Azure Storage Account ADLS gen2, Synapse Workspace, Synapse Azure Storage Account ADLS gen2, PostgreSQL pool) associated with public endpoints. 
+2. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, you can check whether all the associated resources are deployed. 
 
-    ```bash
-        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a deploy-public-datasource
-    ```
-    After this step, dataset files are copied in the container 'test01' in the new storage.
+3. In the Azure Portal, select Microsoft Foundry Project resource whose name starts with foundryproject. On the Overview tab, click on the 'Go to Foundry portal' button to open the Microsoft Foundry portal. Click on the tab 'Models + endpoints'. You should see the 'gpt-4.1-mini' deployed on Microsoft Foundry.
 
+    ![Open AI Models](./diagrams/open-ai.png)
 
-3. From this stage, you can open the Azure Machine Learning portal (https://ml.azure.com/) to check whether the Workspace has been created with the following name format: workspace{env}{visibility}{suffix}
+4. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute'. You should see 2 compute instances deployed, one CPU based (Standard_DS11_v2) and another one GPU based (Standard_NC4as_T4_v3).
 
-6. When your test are over, you can remove the infrastructure running the following commands:
+    ![Computes](./diagrams/computes.png)
+
+5. Click on the tab 'Notebooks', you should see the following notebooks under 'Users\shared':
+    - deploy-model-empty.ipynb: Notebook to deploy a model which always send the same response (used to capture the requests coming from the evaluation pipeline or notebooks)
+    - deploy-model-opt350m.ipynb: Notebook to deploy the model Opt350m from Hugging Face 
+    - deploy-model-qwen2-15b.ipynb: Notebook to deploy the model Qwen2-1.5b from Hugging Face
+    - evaluation-model-empty.ipynb: Notebook to run safety evaluation of the empty model
+    - evaluation-model-opt350m.ipynb: Notebook to run safety evaluation of the Opt350m model
+    - evaluation-model-qwen2-15b.ipynb: Notebook to run safety evaluation of the Qwen2-1.5b model
+    - evaluation-model-open-ai.ipynb: Notebook to run safety evaluation of the Open AI model ('gpt-4.1-mini') deployed in Microsoft Foundry.
+
+    ![Notebooks](./diagrams/notebooks.png)
+
+    Beyond the notebooks, the scoring scripts are also copied under 'Users\shared\src':
+    - score-empty.py: Scoring script used with empty model 
+    - score-opt350m.py: Scoring script used with Opt350m model 
+    - score-qwen2-15b.py: Scoring script used with Qwen2-1.5b model 
+
+7. If you face any error when running the notebooks, check whether your Microsoft Entra ID token expired. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute', click on the 'Authenticate' button, to renew your Microsoft Entra ID token. This token will be used to call most of the endpoints hosting the differents models.
+
+    ![Authentication Error](./diagrams/auth.png)
+
+8. When your tests are over, you can remove the infrastructure running the following commands:
 
     ```bash
         vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a remove-public-azure-ai
-        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a remove-public-datasource
     ```
 
 
@@ -323,6 +336,31 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 
 
 
+11. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, you can check whether all the associated resources are deployed. 
+
+12. In the Azure Portal, select Microsoft Foundry Project resource whose name starts with foundryproject. On the Overview tab, click on the 'Go to Foundry portal' button to open the Microsoft Foundry portal. Click on the tab 'Models + endpoints'. You should see the 'gpt-4.1-mini' deployed on Microsoft Foundry.
+
+    ![Open AI Models](./diagrams/open-ai.png)
+
+13. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute'. You should see 2 compute instances deployed, one CPU based (Standard_DS11_v2) and another one GPU based (Standard_NC4as_T4_v3).
+
+    ![Computes](./diagrams/computes.png)
+
+14. Click on the tab 'Notebooks', you should see the following notebooks under 'Users\shared':
+    - deploy-model-empty.ipynb: Notebook to deploy a model which always send the same response (used to capture the requests coming from the evaluation pipeline or notebooks)
+    - deploy-model-opt350m.ipynb: Notebook to deploy the model Opt350m from Hugging Face 
+    - deploy-model-qwen2-15b.ipynb: Notebook to deploy the model Qwen2-1.5b from Hugging Face
+    - evaluation-model-empty.ipynb: Notebook to run safety evaluation of the empty model
+    - evaluation-model-opt350m.ipynb: Notebook to run safety evaluation of the Opt350m model
+    - evaluation-model-qwen2-15b.ipynb: Notebook to run safety evaluation of the Qwen2-1.5b model
+    - evaluation-model-open-ai.ipynb: Notebook to run safety evaluation of the Open AI model ('gpt-4.1-mini') deployed in Microsoft Foundry.
+
+    ![Notebooks](./diagrams/notebooks.png)
+
+    Beyond the notebooks, the scoring scripts are also copied under 'Users\shared\src':
+    - score-empty.py: Scoring script used with empty model 
+    - score-opt350m.py: Scoring script used with Opt350m model 
+    - score-qwen2-15b.py: Scoring script used with Qwen2-1.5b model 
 
 ##### Removing the resources
 
