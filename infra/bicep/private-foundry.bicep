@@ -82,3 +82,10 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
 output foundryName string = aiFoundry.name
 output foundryId string = aiFoundry.id
 output projectName string = aiProject.name
+output projectId string = aiProject.id
+output modelDeploymentName string = modelDeployment.name  
+output modelDeploymentId string = modelDeployment.id
+output modelDeploymentUri string = aiFoundry.properties.endpoint
+output modelDeploymentKey string = listKeys(aiFoundry.id, aiFoundry.apiVersion).key1
+output modelDeploymentModelApiVersion string = modelDeployment.properties.model.versionoutput 
+output modelDeploymentModelName string = modelDeployment.properties.model.name
