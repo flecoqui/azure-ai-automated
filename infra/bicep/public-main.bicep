@@ -112,6 +112,8 @@ module foundryModule 'public-foundry.bicep' = {
     location: location
     foundryName: namingModule.outputs.foundryName
     foundryProjectName: namingModule.outputs.foundryProjectName
+    objectId: objectId
+    objectType: objectType    
     tags: tags
   }
 }

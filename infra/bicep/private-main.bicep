@@ -218,6 +218,8 @@ module foundryModule 'private-foundry.bicep' = {
     appInsightsId: appInsightsModule.outputs.outAppInsightsId
     storageId: storageModule.outputs.outStorageAccountId
     keyVaultId: keyVaultModule.outputs.outKeyVaultId
+    objectId: objectId
+    objectType: objectType    
     tags: tags
   }
 }

@@ -16,6 +16,12 @@ param storageId string
 @description('Resource ID of the Azure Key Vault.')
 param keyVaultId string
 
+@description('The user object Id of the user or service principal running the script.')
+param objectId string = ''
+
+@description('The  object type User or ServicePrincipal.')
+param objectType string = 'User'
+
 @description('The tags to be applied to the provisioned resources.')
 param tags object
 
@@ -78,6 +84,19 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
   }
   tags: tags
 }
+
+// The role definition ID for the Cognitive Services OpenAI User role, which is required to use the Foundry account.
+var roleCognitiveServicesOpenAIUser = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+resource cognitiveServicesOpenAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aiProject.id, objectId, roleCognitiveServicesOpenAIUser)
+  scope: aiProject
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleCognitiveServicesOpenAIUser)
+    principalId: objectId
+    principalType: objectType
+  }
+}
+
 
 output foundryName string = aiFoundry.name
 output foundryId string = aiFoundry.id
