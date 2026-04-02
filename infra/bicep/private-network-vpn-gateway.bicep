@@ -11,7 +11,7 @@ param vnetName string
 @description('The name of the virtual network subnet to be used for private endpoints.')
 param privateEndpointSubnetName string
 
-@description('The name of the virtual network subnet to be used for Fabric Data Gateway subnet.')
+@description('The name of the virtual network subnet to be used for Azure AI Jump Box subnet.')
 param datagwSubnetName string
 
 @description('The virtual network IP space to use for the new virutal network.')
@@ -23,7 +23,7 @@ param privateEndpointSubnetAddressPrefix string
 @description('The IP space to use for the AzureBastionSubnet subnet.')
 param bastionSubnetAddressPrefix string
 
-@description('The IP space to use for Fabric Data Gateway.')
+@description('The IP space to use for Azure AI Jump Box subnet.')
 param datagwSubnetAddressPrefix string
 
 @description('The IP address prefix for the virtual network subnet used for VPN Gateway.')
@@ -58,6 +58,55 @@ resource vnet 'Microsoft.Network/virtualNetworks@2021-03-01' = {
       ]
     }
     dhcpOptions: { dnsServers: [dnsDelegationSubnetIPAddress] }
+    subnets: [
+      {
+        name: privateEndpointSubnetName
+        properties: {
+          addressPrefix: privateEndpointSubnetAddressPrefix
+          networkSecurityGroup: {
+            id: defaultNsgSubnet.id
+          }
+        }
+      }
+      {
+        name: datagwSubnetName
+        properties: {
+          addressPrefix: datagwSubnetAddressPrefix
+          networkSecurityGroup: {
+            id: datagwSubnetNsg.id
+          }
+        }
+      }
+      {
+        name: bastionSubnetName
+        properties: {
+          addressPrefix: bastionSubnetAddressPrefix
+        }
+      }
+      {
+        name: dnsDelegationSubNetName
+        properties: {
+          addressPrefix: dnsDelegationSubnetAddressPrefix
+          networkSecurityGroup: {
+            id: dnsDelegationSubnetNsg.id
+          }
+          delegations: [
+            {
+              name: 'Microsoft.Network.dnsResolvers'
+              properties: {
+                serviceName: 'Microsoft.Network/dnsResolvers'
+              }
+            }
+          ]
+        }
+      }
+      {
+        name: gatewaySubnetName
+        properties: {
+          addressPrefix: gatewaySubnetAddressPrefix
+        }
+      }
+    ]
   }
 }
 // network security group for site
@@ -69,17 +118,6 @@ resource defaultNsgSubnet 'Microsoft.Network/networkSecurityGroups@2020-05-01' =
   }
 }
 
-resource defaultSubNet 'Microsoft.Network/virtualNetworks/subnets@2024-03-01' = {
-  parent: vnet
-  name: privateEndpointSubnetName
-  properties: {
-    addressPrefix: privateEndpointSubnetAddressPrefix
-    networkSecurityGroup: {
-      id: defaultNsgSubnet.id // Associate the NSG with the default subnet
-    }
-  }
-}
-
 resource datagwSubnetNsg 'Microsoft.Network/networkSecurityGroups@2020-05-01' = {
   name: '${vnetName}-datagw-nsg'
   location: location
@@ -88,42 +126,6 @@ resource datagwSubnetNsg 'Microsoft.Network/networkSecurityGroups@2020-05-01' = 
   }
 }
 
-resource datagwSubNet 'Microsoft.Network/virtualNetworks/subnets@2024-03-01' = {
-  parent: vnet
-  name: datagwSubnetName
-  properties: {
-    addressPrefix: datagwSubnetAddressPrefix
-    networkSecurityGroup: {
-      id: datagwSubnetNsg.id // Associate the NSG with the default subnet
-    }
-  }
-  dependsOn: [
-    defaultSubNet
-  ]
-}
-
-resource bastionSubNet 'Microsoft.Network/virtualNetworks/subnets@2024-03-01' = {
-  parent: vnet
-  name: bastionSubnetName
-  properties: {
-    addressPrefix: bastionSubnetAddressPrefix
-  }
-  dependsOn: [
-    datagwSubNet
-  ]
-}
-
-
-resource gatewaySubNet 'Microsoft.Network/virtualNetworks/subnets@2024-03-01' = {
-  parent: vnet
-  name: gatewaySubnetName
-  properties: {
-    addressPrefix: gatewaySubnetAddressPrefix
-  }
-  dependsOn: [
-    dnsDelegationSubNet
-  ]
-}
 
 resource dnsDelegationSubnetNsg 'Microsoft.Network/networkSecurityGroups@2020-05-01' = {
   name: '${vnetName}-dns-delegation-nsg'
@@ -132,29 +134,6 @@ resource dnsDelegationSubnetNsg 'Microsoft.Network/networkSecurityGroups@2020-05
     securityRules: []
   }
 }
-
-resource dnsDelegationSubNet 'Microsoft.Network/virtualNetworks/subnets@2024-03-01' = {
-  parent: vnet
-  name: dnsDelegationSubNetName
-  properties: {
-    addressPrefix: dnsDelegationSubnetAddressPrefix
-    networkSecurityGroup: {
-      id: dnsDelegationSubnetNsg.id // Associate the NSG with the default subnet
-    }
-    delegations: [
-      {
-        name: 'Microsoft.Network.dnsResolvers'
-        properties: {
-          serviceName: 'Microsoft.Network/dnsResolvers'
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    bastionSubNet
-  ]
-}
-
 
 // ----------------------------------------------------
 // LOCAL Private DNS Zone
@@ -176,9 +155,6 @@ resource vnetLinkLocal 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@20
     }
     registrationEnabled: true
   }
-  dependsOn: [
-    dnsDelegationSubNet
-  ]
 }
 
 // ------------------------------------------------------------------
@@ -207,7 +183,7 @@ resource vpnGateway 'Microsoft.Network/virtualNetworkGateways@2024-07-01' = {
           }
           privateIPAllocationMethod: 'Dynamic'
           subnet: {
-            id: gatewaySubNet.id
+            id: '${vnet.id}/subnets/${gatewaySubnetName}'
           }
         }
       }
@@ -266,7 +242,7 @@ resource inboundEndpoint 'Microsoft.Network/dnsResolvers/inboundEndpoints@2025-0
         privateIpAddress: dnsDelegationSubnetIPAddress
         privateIpAllocationMethod: 'Static'
         subnet: {
-          id: dnsDelegationSubNet.id
+          id: '${vnet.id}/subnets/${dnsDelegationSubNetName}'
         }
       }
     ]

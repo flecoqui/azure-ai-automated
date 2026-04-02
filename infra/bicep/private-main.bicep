@@ -22,7 +22,7 @@ param privateEndpointSubnetAddressPrefix string = '10.13.0.0/24'
 @description('The IP address prefix for the virtual network subnet used for AzureBastionSubnet subnet.')
 param bastionSubnetAddressPrefix string =  '10.13.1.0/24'
 
-@description('The IP address prefix for the virtual network subnet used for Fabric Data gateaway subnet.')
+@description('The IP address prefix for the virtual network subnet used for Azure AI Jump Box subnet.')
 param datagwSubnetAddressPrefix string =  '10.13.2.0/24'
 
 @description('The IP address prefix for the virtual network subnet used for VPN Gateway.')
@@ -80,6 +80,8 @@ var datagwSubnetName = namingModule.outputs.datagwSubnetName
 var privateDnsNames = [
   'privatelink.vaultcore.azure.net'
   'privatelink.blob.${environment().suffixes.storage}'
+  'privatelink.file.${environment().suffixes.storage}'
+  'privatelink.dfs.${environment().suffixes.storage}'
   'privatelink.azurecr.io'
   'privatelink.api.azureml.ms'
   'privatelink.notebooks.azure.net'
@@ -93,6 +95,8 @@ var calcDnsZoneSubscriptionId = (newOrExistingDnsZones == 'new') ? subscription(
 
 // Getting the Ids for existing or newly created Private DNS Zones
 var blobPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.blob.${environment().suffixes.storage}')
+var filePrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.file.${environment().suffixes.storage}')
+var dfsPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.dfs.${environment().suffixes.storage}') 
 var acrPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.azurecr.io')
 var keyVaultPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.vaultcore.azure.net')
 var azmlApiPrivateDnsZoneId = resourceId(calcDnsZoneSubscriptionId, calcDnsZoneResourceGroupName, 'Microsoft.Network/privateDnsZones', 'privatelink.api.azureml.ms')
@@ -152,6 +156,7 @@ module keyVaultModule 'private-keyvault.bicep' = {
     keyVaultPrivateDnsZoneId: keyVaultPrivateDnsZoneId
     vnetName: networkModule.outputs.outVnetName
     subnetName: networkModule.outputs.outPrivateEndpointSubnetName
+    vnetResourceGroupName: calcDnsZoneResourceGroupName
     objectId: objectId 
     objectType: objectType
     tags: tags
@@ -171,9 +176,11 @@ module storageModule 'private-storage.bicep' = {
     defaultContainerName: namingModule.outputs.storageAccountDefaultContainerName
     vnetName: vnetName
     subnetName: privateEndpointSubnetName
-    vnetResourceGroupName: dnsZoneResourceGroupName
+    vnetResourceGroupName: calcDnsZoneResourceGroupName
     blobPrivateDnsZoneId: blobPrivateDnsZoneId
-    azmlPrincipalId: azmlPrincipalId
+    filePrivateDnsZoneId: filePrivateDnsZoneId
+    dfsPrivateDnsZoneId: dfsPrivateDnsZoneId
+    foundryPrincipalId: foundryModule.outputs.foundryPrincipalId
     objectId: objectId
     objectType: objectType
     clientIpAddress: clientIpAddress
@@ -223,8 +230,13 @@ module azmlModule 'private-azml.bicep' = {
     keyVaultId: keyVaultModule.outputs.outKeyVaultId
     vnetName: networkModule.outputs.outVnetName
     subnetName: networkModule.outputs.outPrivateEndpointSubnetName
+    vnetResourceGroupName: calcDnsZoneResourceGroupName
     azmlApiPrivateDnsZoneId: azmlApiPrivateDnsZoneId
     azmlNotebooksPrivateDnsZoneId: azmlNotebooksPrivateDnsZoneId
+    computeInstanceName: namingModule.outputs.azureMLComputeInstanceName
+    computeInstanceCPUSize: namingModule.outputs.azureMLComputeCPUSize
+    computeInstanceGPUSize: namingModule.outputs.azureMLComputeGPUSize
+    objectId: objectId       
     tags: tags
   }
   dependsOn: [
@@ -239,12 +251,10 @@ module foundryModule 'private-foundry.bicep' = {
     location: location
     baseName: baseName
     foundryName: namingModule.outputs.foundryName
-    acrId: containerRegistryModule.outputs.outAcrId
-    appInsightsId: appInsightsModule.outputs.outAppInsightsId
-    storageId: storageModule.outputs.outStorageAccountId
-    keyVaultId: keyVaultModule.outputs.outKeyVaultId
+    foundryProjectName: namingModule.outputs.foundryProjectName
     vnetName: networkModule.outputs.outVnetName
     subnetName: networkModule.outputs.outPrivateEndpointSubnetName
+    vnetResourceGroupName: calcDnsZoneResourceGroupName
     cognitiveServicesPrivateDnsZoneId: cognitiveServicesPrivateDnsZoneId
     openAiPrivateDnsZoneId: openAiPrivateDnsZoneId
     objectId: objectId

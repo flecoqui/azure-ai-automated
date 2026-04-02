@@ -8,23 +8,17 @@ param baseName string
 @description('Name of the Microsoft Foundry.')
 param foundryName string
 
+@description('Name of the Microsoft Foundry Project.')
+param foundryProjectName string
+
 @description('The name of the virtual network for virtual network integration.')
 param vnetName string
 
 @description('The name of the virtual network subnet to be used for private endpoints.')
 param subnetName string
 
-@description('The resource ID of the Azure Container Registry.')
-param acrId string
-
-@description('The resource ID of the Application Insights instance.')
-param appInsightsId string
-
-@description('The resource ID of the storage account for Azure ML.')
-param storageId string
-
-@description('Resource ID of the Azure Key Vault.')
-param keyVaultId string
+@description('The name of the resource group containing the virtual network.')
+param vnetResourceGroupName string
 
 @description('The Private DNS Zone id for the Cognitive Services private endpoint.')
 param cognitiveServicesPrivateDnsZoneId string
@@ -41,7 +35,7 @@ param objectType string = 'User'
 @description('The tags to be applied to the provisioned resources.')
 param tags object
 
-var privateSubnetId = '${resourceId('Microsoft.Network/virtualNetworks', vnetName)}/subnets/${subnetName}'
+var privateSubnetId = '${resourceId(vnetResourceGroupName,'Microsoft.Network/virtualNetworks', vnetName)}/subnets/${subnetName}'
 
 /*
   An AI Foundry resources is a variant of a CognitiveServices/account resource type
@@ -74,7 +68,7 @@ resource aiFoundry 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   Projects may be granted individual RBAC permissions and identities on top of what account provides.
 */ 
 resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
-  name: '${foundryName}-project'
+  name: foundryProjectName
   parent: aiFoundry
   location: location
   identity: {
@@ -82,6 +76,9 @@ resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = 
   }
   properties: {}
   tags: tags
+  dependsOn: [
+    foundryPrivateEndpoint
+  ]
 }
 
 /*
@@ -102,6 +99,9 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
     }
   }
   tags: tags
+  dependsOn: [
+    foundryPrivateEndpoint
+  ]
 }
 
 resource foundryPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' = {
@@ -160,6 +160,7 @@ resource cognitiveServicesOpenAIUserRoleAssignment 'Microsoft.Authorization/role
 
 output foundryName string = aiFoundry.name
 output foundryId string = aiFoundry.id
+output foundryPrincipalId string = aiFoundry.identity.principalId
 output projectName string = aiProject.name
 output projectId string = aiProject.id
 output modelDeploymentName string = modelDeployment.name  

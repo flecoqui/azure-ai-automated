@@ -23,8 +23,14 @@ param vnetResourceGroupName  string
 @description('The Private DNS Zone id for registering storage "blob" private endpoints.')
 param blobPrivateDnsZoneId string
 
-@description('The Fabric account principal ID.')
-param azmlPrincipalId string = ''
+@description('The Private DNS Zone id for registering storage "file" private endpoints.')
+param filePrivateDnsZoneId string
+
+@description('The Private DNS Zone id for registering storage "dfs" private endpoints.')
+param dfsPrivateDnsZoneId string
+
+@description('The Foundry account principal ID.')
+param foundryPrincipalId string = ''
 
 @description('The user object Id of the user or service principal running the script.')
 param objectId string = ''
@@ -41,8 +47,9 @@ param tags object
 // https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#storage-blob-data-contributor
 var roleStorageBlobDataContributor = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var roleStorageBlobDataReader='2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
-// var roleStorageFileContributor='69566ab7-960f-475b-8e7c-b3118f30c6bd'
+var roleStorageFilePrivilegedContributor='69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var roleStorageFileReader='b8eda974-7b85-4f76-af95-65846b26df6d'
+var roleStorageFileSMBShareContributor = '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb'
 
 var privateSubnetId = '${resourceId(vnetResourceGroupName,'Microsoft.Network/virtualNetworks', vnetName)}/subnets/${subnetName}'
 
@@ -52,6 +59,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
   properties: {
     accessTier: 'Hot'
     supportsHttpsTrafficOnly: true
+    allowSharedKeyAccess: true
     isHnsEnabled: false
     networkAcls: {
       bypass: 'AzureServices'
@@ -67,7 +75,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
     publicNetworkAccess: 'Disabled'
   }
   sku: {
-    name: 'Standard_RAGRS'
+    name: 'Standard_LRS'
   }
   kind: 'StorageV2'
   tags: tags
@@ -117,6 +125,42 @@ resource dnsZonesGroupsBlob 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
   }
 }
 
+resource privateEndpointFile 'Microsoft.Network/privateEndpoints@2021-03-01' = {
+  name: 'pe-st-file-${baseName}'
+  location: location
+  properties: {
+    subnet: {
+      id: privateSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'plsc-st-file-${baseName}'
+        properties: {
+          privateLinkServiceId: storageAccount.id
+          groupIds: [
+            'file'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource dnsZonesGroupsFile 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-03-01' = {
+  parent: privateEndpointFile
+  name: 'filePrivateDnsZoneGroup'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'config'
+        properties: {
+          privateDnsZoneId: filePrivateDnsZoneId
+        }
+      }
+    ]
+  }
+}
+
 resource privateEndpointDfs 'Microsoft.Network/privateEndpoints@2021-03-01' = {
   name: 'pe-st-dfs-${baseName}'
   location: location
@@ -138,22 +182,37 @@ resource privateEndpointDfs 'Microsoft.Network/privateEndpoints@2021-03-01' = {
   }
 }
 
+resource dnsZonesGroupsDfs 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-03-01' = {
+  parent: privateEndpointDfs
+  name: 'dfsPrivateDnsZoneGroup'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'config'
+        properties: {
+          privateDnsZoneId: dfsPrivateDnsZoneId
+        }
+      }
+    ]
+  }
+}
+
 resource storageBlobRoleAssignment1 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, azmlPrincipalId, roleStorageBlobDataReader)
+  name: guid(storageAccount.id, foundryPrincipalId, roleStorageBlobDataReader)
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageBlobDataReader)
-    principalId: azmlPrincipalId
+    principalId: foundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 resource storageFileRoleAssignment1 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, azmlPrincipalId, roleStorageFileReader)
+  name: guid(storageAccount.id, foundryPrincipalId, roleStorageFileReader)
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageFileReader)
-    principalId: azmlPrincipalId
+    principalId: foundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -163,6 +222,26 @@ resource storageBlobRoleAssignment2 'Microsoft.Authorization/roleAssignments@202
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageBlobDataContributor)
+    principalId: objectId
+    principalType: objectType
+  }
+}
+
+resource storageFileSMBShareContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, objectId, roleStorageFileSMBShareContributor)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageFileSMBShareContributor)
+    principalId: objectId
+    principalType: objectType
+  }
+}
+
+resource storageFilePrivilegedContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, objectId, roleStorageFilePrivilegedContributor)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageFilePrivilegedContributor)
     principalId: objectId
     principalType: objectType
   }

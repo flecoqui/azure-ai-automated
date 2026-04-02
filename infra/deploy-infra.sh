@@ -138,7 +138,7 @@ setAzureResourceNames()
     RG="$4"
 
     printProgress "Getting Azure resource names for env='$env' visibility='$visibility' suffix='$suffix' from bicep file: $SCRIPTS_DIRECTORY/bicep/naming-convention.bicep"
-    DEPLOY_NAME=$(date +"%y%m%d%H%M%S")
+    DEPLOY_NAME=$(date +"naming-convention-%y%m%d%H%M%S")
     cmd="az deployment group create --name \"${DEPLOY_NAME}\" --resource-group \"${RG}\" --template-file $SCRIPTS_DIRECTORY/bicep/naming-convention.bicep --parameters suffix=\"${suffix}\" environment=\"${env}\" visibility=\"${visibility}\""
     # printProgress "$cmd"
     eval "$cmd" 2>/dev/null >/dev/null|| true
@@ -219,7 +219,7 @@ readDeploymentOutputs()
 }
 
 ##############################################################################
-#- Get Fabric Resource Group Name
+#- Get Azure AI Resource Group Name
 #  arg 1: Env
 #  arg 2: Visibility
 #  arg 3: Suffix
@@ -579,164 +579,47 @@ readSecretInKeyVault(){
     #checkError
 }
 ##############################################################################
-#- installPreRequisites: Fabric provider, EventHub provider
+#- getLatestDeploymentNameInResourceGroup
 ##############################################################################
-installPreRequisites(){
-    cmd="az config set extension.dynamic_install_allow_preview=true"
-    eval "$cmd" >/dev/null 2>/dev/null || true
-    cmd="az provider list --query \"[?namespace=='Microsoft.Fabric'].namespace\" -o tsv"
-    NAME=$(eval "$cmd" 2>/dev/null) || true
-    if [ -z "$NAME" ] || [ "$NAME" != "Microsoft.Fabric" ]; then
-        printProgress "Register Fabric provider"
-        cmd="az provider register -n \"Microsoft.Fabric\""
-        eval "$cmd" 1>/dev/null
-        checkError
-    fi
-    cmd="az provider list --query \"[?namespace=='Microsoft.EventHub'].namespace\" -o tsv"
-    NAME=$(eval "$cmd" 2>/dev/null) || true
-    if [ -z "$NAME" ] || [ "$NAME" != "Microsoft.EventHub" ]; then
-        printProgress "Register EventHub provider"
-        cmd="az provider register -n \"Microsoft.EventHub\""
-        eval "$cmd" 1>/dev/null
-        checkError
-    fi
-  
-}
-##############################################################################
-#- installSqlcmd
-##############################################################################
-installSqlcmd(){
-    # 1. Download and install Microsoft's GPG key
-    curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
-
-    # 2. Add the Microsoft SQL Server repository
-    # For Ubuntu 22.04 (Jammy)
-    curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
-
-    # For Ubuntu 20.04 (Focal) - use this if above doesn't work
-    # curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
-
-    # For Debian (if you're on Debian)
-    # curl https://packages.microsoft.com/config/debian/12/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
-
-    # 3. Update package lists
-    sudo apt-get update
-
-    # 4. Install mssql-tools (includes sqlcmd and bcp)
-    sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
-
-    # 5. Add sqlcmd to PATH (optional but recommended)
-    echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> ~/.bashrc
-    source ~/.bashrc
-}
-##############################################################################
-#- createFabricPostgreSQLManagedPrivateEndpoints 
-##############################################################################
-createFabricPostgreSQLManagedPrivateEndpoints ()
+getLatestDeploymentNameInResourceGroup()
 {
-    workspaceName="$1"
-    resourceGroup="$2"
-    postgresql="$3"
-    groupId="postgresqlServer"
-    endpointName="mpe-${postgresql}-${groupId}"
-    postgresqlResourceId=$(az postgres flexible-server show -n $postgresql  -g $resourceGroup --query id -o tsv)
-    token=$(az account get-access-token   --resource https://api.fabric.microsoft.com   --query accessToken -o tsv)
-    workspaceId=$(getFabricWorkspaceId $workspaceName)
+    RG="$1"
+    PREFIX="$2"
 
-    printProgress "Creating Managed Private Endpoint: $endpointName"
-    curl --request POST \
-        --url "https://api.fabric.microsoft.com/v1/workspaces/${workspaceId}/managedPrivateEndpoints" \
-        --header "Authorization: Bearer $token" \
-        --header "Content-Type: application/json" \
-        --data  "{\"name\": \"${endpointName}\",\"targetPrivateLinkResourceId\": \"${postgresqlResourceId}\",\"targetSubresourceType\": \"${groupId}\",\"requestMessage\": \"Fabric access request for PostgreSQL\"}" \
-        --fail --silent --show-error 
-    sleep 30
-    for arg in $(az postgres flexible-server show -n ${postgresql}  -g ${resourceGroup} --query "privateEndpointConnections[?privateLinkServiceConnectionState.status=='Pending'].id" -o tsv); do
-        printProgress "Approving private Endpoint Connection: $arg"
-        az postgres flexible-server private-endpoint-connection approve --id $arg 
-    done
+    cmd="az deployment group list --resource-group \"${RG}\" --query \"sort_by([?starts_with(name, '${PREFIX}')], &properties.timestamp)[-1].name\" -o tsv"
+    #printProgress "$cmd"
+    RESULT=$(eval "$cmd")
+    checkError
+
+    echo "${RESULT}"
 }
 ##############################################################################
-#- createFabricCosmosDBManagedPrivateEndpoints 
+#- openStorageFirewall
 ##############################################################################
-createFabricCosmosDBManagedPrivateEndpoints ()
+openStorageFirewall()
 {
-    workspaceName="$1"
+    storage="$1"
     resourceGroup="$2"
-    cosmosdb="$3"
-    groupId="sql"
-    endpointName="mpe-${cosmosdb}-${groupId}"
-    cosmosdbResourceId=$(az cosmosdb show -n $cosmosdb  -g $resourceGroup --query id -o tsv)
-    token=$(az account get-access-token   --resource https://api.fabric.microsoft.com   --query accessToken -o tsv)
-    workspaceId=$(getFabricWorkspaceId $workspaceName)
 
-    printProgress "Creating Managed Private Endpoint: $endpointName"
-    curl --request POST \
-        --url "https://api.fabric.microsoft.com/v1/workspaces/${workspaceId}/managedPrivateEndpoints" \
-        --header "Authorization: Bearer $token" \
-        --header "Content-Type: application/json" \
-        --data  "{\"name\": \"${endpointName}\",\"targetPrivateLinkResourceId\": \"${cosmosdbResourceId}\",\"targetSubresourceType\": \"${groupId}\",\"requestMessage\": \"Fabric access request for Cosmos DB\"}" \
-        --fail --silent --show-error 
+    printProgress "Opening Storage Account Firewall ..."
+    cmd="az storage account update -n ${storage} -g ${resourceGroup} --default-action Allow --public-network-access Enabled --output none"
+    printProgress "$cmd"
+    eval "$cmd"
     sleep 30
-    for arg in $(az cosmosdb show -n ${cosmosdb}  -g ${resourceGroup} --query "privateEndpointConnections[?privateLinkServiceConnectionState.status=='Pending'].id" -o tsv); do
-        printProgress "Approving private Endpoint Connection: $arg"
-        az cosmosdb private-endpoint-connection approve --id $arg 
-    done
-
 }
 ##############################################################################
-#- createFabricStorageManagedPrivateEndpoints
+#- closeStorageFirewall
 ##############################################################################
-createFabricStorageManagedPrivateEndpoints ()
+closeStorageFirewall()
 {
-    workspaceName="$1"
+    storage="$1"
     resourceGroup="$2"
-    storage="$3"
-    groupId="blob"
-    endpointName="mpe-${storage}-${groupId}"
-    storageResourceId=$(az storage account show -n $storage  -g $resourceGroup --query id -o tsv)
-    token=$(az account get-access-token   --resource https://api.fabric.microsoft.com   --query accessToken -o tsv)
-    workspaceId=$(getFabricWorkspaceId $workspaceName)
 
-    printProgress "Creating Managed Private Endpoint: $endpointName"
-    curl --request POST \
-        --url "https://api.fabric.microsoft.com/v1/workspaces/${workspaceId}/managedPrivateEndpoints" \
-        --header "Authorization: Bearer $token" \
-        --header "Content-Type: application/json" \
-        --data  "{\"name\": \"${endpointName}\",\"targetPrivateLinkResourceId\": \"${storageResourceId}\",\"targetSubresourceType\": \"${groupId}\",\"requestMessage\": \"Fabric access request for Storage Account\"}" \
-        --fail --silent --show-error 
+    printProgress "Closing Storage Account Firewall ..."
+    cmd="az storage account update -n ${storage} -g ${resourceGroup} --default-action Deny --public-network-access Disabled --output none"
+    printProgress "$cmd"
+    eval "$cmd"
     sleep 30
-    for arg in $(az storage account show -n ${storage}  -g ${resourceGroup} --query "privateEndpointConnections[?privateLinkServiceConnectionState.status=='Pending'].id" -o tsv); do
-        printProgress "Approving private Endpoint Connection: $arg"
-        az storage account private-endpoint-connection approve --id $arg 
-    done
-}
-##############################################################################
-#- createFabricKeyVaultManagedPrivateEndpoints
-##############################################################################
-createFabricKeyVaultManagedPrivateEndpoints ()
-{
-    workspaceName="$1"
-    resourceGroup="$2"
-    keyVault="$3"
-    groupId="vault"
-    endpointName="mpe-${keyVault}-${groupId}"
-    keyVaultResourceId=$(az keyvault show -n $keyVault -g $resourceGroup --query id -o tsv)
-    token=$(az account get-access-token   --resource https://api.fabric.microsoft.com   --query accessToken -o tsv)
-    workspaceId=$(getFabricWorkspaceId $workspaceName)
-
-    printProgress "Creating Managed Private Endpoint: $endpointName"
-    curl --request POST \
-        --url "https://api.fabric.microsoft.com/v1/workspaces/${workspaceId}/managedPrivateEndpoints" \
-        --header "Authorization: Bearer $token" \
-        --header "Content-Type: application/json" \
-        --data  "{\"name\": \"${endpointName}\",\"targetPrivateLinkResourceId\": \"${keyVaultResourceId}\",\"targetSubresourceType\": \"${groupId}\",\"requestMessage\": \"Fabric access request for Key Vault\"}" \
-        --fail --silent --show-error 
-    sleep 30
-    for arg in $(az keyvault show -n ${keyVault} -g ${resourceGroup}  --query "properties.privateEndpointConnections[?privateLinkServiceConnectionState.status=='Pending'].id" -o tsv); do
-        printProgress "Approving private Endpoint Connection: $arg"
-        az network private-endpoint-connection approve --id $arg 
-    done
 }
 ##############################################################################
 #- uploadNotebooks
@@ -770,7 +653,8 @@ uploadNotebooks ()
         eval "$cmd" 1>/dev/null 2>/dev/null || true
         current="$(dirname "$current")"
     done | tac
-
+    # Add 5 seconds sleep to make sure the directory is created before uploading files, otherwise upload may fail with "The specified resource does not exist" error
+    sleep 5 
     printProgress "Uploading notebooks..."
     cmd="az storage file upload \
       --auth-mode login \
@@ -792,10 +676,9 @@ DEFAULT_ENVIRONMENT="dev"
 DEFAULT_REGION="westus3"
 DEFAULT_SUBSCRIPTION_ID=""
 DEFAULT_TENANT_ID=""
-DEFAULT_RESOURCE_GROUP="rg${DEFAULT_ENVIRONMENT}publicfabric"
+DEFAULT_RESOURCE_GROUP="rg${DEFAULT_ENVIRONMENT}public"
 DEFAULT_POSTGRESQL_ADMIN_USERNAME="sqladmin"
 DEFAULT_VM_ADMIN_USERNAME="vmadmin"
-DEFAULT_DATAGW_VM_USERNAME="datagwadmin"
 ARG_ACTION="${DEFAULT_ACTION}"
 ARG_CONFIGURATION_FILE="${DEFAULT_CONFIGURATION_FILE}"
 ARG_ENVIRONMENT="${DEFAULT_ENVIRONMENT}"
@@ -803,7 +686,6 @@ ARG_REGION="${DEFAULT_REGION}"
 ARG_SUBSCRIPTION_ID="${DEFAULT_SUBSCRIPTION_ID}"
 ARG_TENANT_ID="${DEFAULT_TENANT_ID}"
 ARG_RESOURCE_GROUP="${DEFAULT_RESOURCE_GROUP}"
-FABRIC_SKU="F2"
 # shellcheck disable=SC2034
 while getopts "a:c:e:r:s:t:g:" opt; do
     case $opt in
@@ -833,6 +715,7 @@ fi
 if [ "${ARG_ACTION}" != "deploy-public-azure-ai" ] && \
    [ "${ARG_ACTION}" != "azure-login" ] && \
    [ "${ARG_ACTION}" != "deploy-private-azure-ai" ] && \
+   [ "${ARG_ACTION}" != "configure-private-azure-ai" ] && \
    [ "${ARG_ACTION}" != "remove-public-azure-ai" ] && \
    [ "${ARG_ACTION}" != "remove-private-azure-ai" ]; then
     printError "ACTION '${ARG_ACTION}' not supported, possible values: deploy-public-azure-ai, deploy-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai  "
@@ -905,8 +788,6 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     printProgress "$cmd"
     eval "$cmd" 1>/dev/null 2>/dev/null || true
 
-    printProgress "Checking whether the Azure CLI providers and extensions are installed..."
-    installPreRequisites
     VISIBILITY="pub"
     RESOURCE_GROUP_NAME=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
     if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "false" ]; then
@@ -918,6 +799,8 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     else
         printProgress "Resource group '${RESOURCE_GROUP_NAME}' already exists"
     fi
+    DEFAULT_DEPLOYMENT_PREFIX="${AZURE_ENVIRONMENT}${VISIBILITY}${AZURE_SUFFIX}"
+
     setAzureResourceNames ${AZURE_ENVIRONMENT} "${VISIBILITY}" "${AZURE_SUFFIX}" "${RESOURCE_GROUP_NAME}"
 
     CLIENT_IP_ADDRESS=$(curl -s https://ifconfig.me)
@@ -927,8 +810,8 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
         exit 1
     fi
     OBJECT_TYPE=$(getCurrentObjectType)
-    printProgress "Deploy public Fabric in resource group '${RESOURCE_GROUP_NAME}'"
-    DEPLOY_NAME=$(date +"%y%m%d%H%M%S")
+    printProgress "Deploy public Azure AI in resource group '${RESOURCE_GROUP_NAME}'"
+    DEPLOY_NAME=$(date +"${DEFAULT_DEPLOYMENT_PREFIX}-%y%m%d%H%M%S")
     cmd="az deployment group create --resource-group $RESOURCE_GROUP_NAME  --name ${DEPLOY_NAME}   \
     --template-file $SCRIPTS_DIRECTORY/bicep/public-main.bicep \
     --parameters \
@@ -1054,8 +937,7 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     cmd="az config set extension.use_dynamic_install=yes_without_prompt"
     printProgress "$cmd"
     eval "$cmd" 1>/dev/null 2>/dev/null || true
-    printProgress "Checking whether the Azure CLI providers and extensions are installed..."
-    installPreRequisites
+
     VISIBILITY="pri"
     RESOURCE_GROUP_NAME=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
     if [ "$(az group exists --name "${RESOURCE_GROUP_NAME}")" = "false" ]; then
@@ -1072,9 +954,12 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     else
         printProgress "Resource group '${RESOURCE_GROUP_NAME}' already exists"
     fi
+    DEFAULT_DEPLOYMENT_PREFIX="${AZURE_ENVIRONMENT}${VISIBILITY}${AZURE_SUFFIX}"
+
     setAzureResourceNames ${AZURE_ENVIRONMENT} "${VISIBILITY}" "${AZURE_SUFFIX}" "${RESOURCE_GROUP_NAME}"
     printProgress "Deploy private azure ML and foundry in resource group '${RESOURCE_GROUP_NAME}'"
-
+    
+    CLIENT_IP_ADDRESS=$(curl -s https://ifconfig.me)
     OBJECT_ID=$(getCurrentObjectId)
     if [ -z "${OBJECT_ID}" ] || [ "${OBJECT_ID}" = "null" ]; then
         printError "Cannot get current user Object Id"
@@ -1082,7 +967,7 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     fi    
     OBJECT_TYPE=$(getCurrentObjectType)
   
-    DEPLOY_NAME=$(date +"%y%m%d%H%M%S")
+    DEPLOY_NAME=$(date +"${DEFAULT_DEPLOYMENT_PREFIX}-%y%m%d%H%M%S")
     cmd="az deployment group create --resource-group $RESOURCE_GROUP_NAME --name ${DEPLOY_NAME} \
     --template-file $SCRIPTS_DIRECTORY/bicep/private-main.bicep \
     --parameters \
@@ -1090,7 +975,6 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     env=${AZURE_ENVIRONMENT} \
     visibility=${VISIBILITY} \
     suffix=${AZURE_SUFFIX} \
-    fabricSKU=${FABRIC_SKU} \
     vnetAddressPrefix=\"10.13.0.0/16\" \
     privateEndpointSubnetAddressPrefix=\"10.13.0.0/24\" \
     bastionSubnetAddressPrefix=\"10.13.1.0/24\" \
@@ -1101,11 +985,141 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     dnsZoneResourceGroupName=\"${RESOURCE_GROUP_NAME}\" \
     dnsZoneSubscriptionId=\"${AZURE_SUBSCRIPTION_ID}\" \
     newOrExistingDnsZones=\"new\" \
-    objectId=\"${OBJECT_ID}\"  objectType=\"${OBJECT_TYPE}\"  \
+    objectId=\"${OBJECT_ID}\"  objectType=\"${OBJECT_TYPE}\" clientIpAddress=\"${CLIENT_IP_ADDRESS}\" \
      --verbose"
     printProgress "$cmd"
     eval "$cmd"
     checkError
+    readDeploymentOutputs ${DEPLOY_NAME} ${RESOURCE_GROUP_NAME}
+
+    # printProgress "Store secrets in Key Vault"
+    # AZURE_ML_MODEL_EMPTY_ID_SECRET_NAME="AZURE-ML-MODEL-EMPTY-ID"
+    # AZURE_ML_MODEL_EMPTY_ID_SECRET="Qwen/Qwen2-1.5B" 
+    # AZURE_ML_MODEL_EMPTY_NAME_SECRET_NAME="AZURE-ML-MODEL-EMPTY-NAME"
+    # AZURE_ML_MODEL_EMPTY_NAME_SECRET="empty" 
+    # AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-EMPTY-SCORE-SCRIPT"
+    # AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET="score-empty.py" 
+    # AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-EMPTY-INSTANCE-TYPE" 
+    # AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET="Standard_DS3_v2" 
+
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_ID_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_ID_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET} true
+
+    # AZURE_ML_MODEL_OPT350M_ID_SECRET_NAME="AZURE-ML-MODEL-OPT350M-ID"
+    # AZURE_ML_MODEL_OPT350M_ID_SECRET="facebook/opt-350m" 
+    # AZURE_ML_MODEL_OPT350M_NAME_SECRET_NAME="AZURE-ML-MODEL-OPT350M-NAME"
+    # AZURE_ML_MODEL_OPT350M_NAME_SECRET="opt350m" 
+    # AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-OPT350M-SCORE-SCRIPT"
+    # AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET="score-opt350m.py" 
+    # AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-OPT350M-INSTANCE-TYPE" 
+    # AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET="Standard_NC4as_T4_v3" 
+
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_ID_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_ID_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_NAME_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_NAME_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_SCORE_SCRIPT_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_OPT350M_INSTANCE_TYPE_SECRET} true
+
+    # AZURE_ML_MODEL_QWEN215B_ID_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-ID"
+    # AZURE_ML_MODEL_QWEN215B_ID_SECRET="Qwen/Qwen2-1.5B" 
+    # AZURE_ML_MODEL_QWEN215B_NAME_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-NAME"
+    # AZURE_ML_MODEL_QWEN215B_NAME_SECRET="qwen215b" 
+    # AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-SCORE-SCRIPT"
+    # AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET="score-qwen2-15b.py" 
+    # AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-QWEN215B-INSTANCE-TYPE" 
+    # AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET="Standard_NC4as_T4_v3"
+
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_ID_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_ID_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_NAME_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_NAME_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_SCORE_SCRIPT_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_QWEN215B_INSTANCE_TYPE_SECRET} true
+
+    # AZURE_ML_MODEL_PREFIX_SECRET_NAME="AZURE-ML-MODEL-PREFIX" 
+    # AZURE_ML_MODEL_PREFIX_SECRET="mdl" 
+    # AZURE_ML_ENDPOINT_PREFIX_SECRET_NAME="AZURE-ML-ENDPOINT-PREFIX" 
+    # AZURE_ML_ENDPOINT_PREFIX_SECRET="edp" 
+    # AZURE_ML_ENV_PREFIX_SECRET_NAME="AZURE-ML-ENV-PREFIX" 
+    # AZURE_ML_ENV_PREFIX_SECRET="env" 
+    # AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME="AZURE-ML-SUBSCRIPTION-ID" 
+    # AZURE_ML_SUBSCRIPTION_ID_SECRET=${AZURE_SUBSCRIPTION_ID} 
+    # AZURE_ML_RESOURCE_GROUP_SECRET_NAME="AZURE-ML-RESOURCE-GROUP" 
+    # AZURE_ML_RESOURCE_GROUP_SECRET=${AZURE_RESOURCE_GROUP_AZURE_AI_NAME} 
+    # AZURE_ML_WORKSPACE_NAME_SECRET_NAME="AZURE-ML-WORKSPACE-NAME"
+    # AZURE_ML_WORKSPACE_NAME_SECRET=${AZURE_ML_NAME} 
+    
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_PREFIX_SECRET_NAME} ${AZURE_ML_MODEL_PREFIX_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENDPOINT_PREFIX_SECRET_NAME} ${AZURE_ML_ENDPOINT_PREFIX_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_ENV_PREFIX_SECRET_NAME} ${AZURE_ML_ENV_PREFIX_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET_NAME} ${AZURE_ML_SUBSCRIPTION_ID_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET_NAME} ${AZURE_ML_RESOURCE_GROUP_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET_NAME} ${AZURE_ML_WORKSPACE_NAME_SECRET} true
+
+    # AZURE_MODEL_DEPLOYMENT_NAME_SECRET_NAME="AZURE-ML-MODEL-DEPLOYMENT-NAME" 
+    # AZURE_MODEL_DEPLOYMENT_NAME_SECRET="${AZURE_MODEL_DEPLOYMENT_NAME}" 
+    # AZURE_MODEL_DEPLOYMENT_URI_SECRET_NAME="AZURE-ML-MODEL-DEPLOYMENT-URI" 
+    # AZURE_MODEL_DEPLOYMENT_URI_SECRET="${AZURE_MODEL_DEPLOYMENT_URI}" 
+    # AZURE_MODEL_DEPLOYMENT_KEY_SECRET_NAME="AZURE-ML-MODEL-DEPLOYMENT-KEY" 
+    # AZURE_MODEL_DEPLOYMENT_KEY_SECRET="${AZURE_MODEL_DEPLOYMENT_KEY}" 
+    # AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET_NAME="AZURE-ML-MODEL-DEPLOYMENT-MODEL-API-VERSION" 
+    # AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET="${AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION}"
+    # AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET_NAME="AZURE-ML-MODEL-DEPLOYMENT-MODEL-NAME" 
+    # AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET="${AZURE_MODEL_DEPLOYMENT_MODEL_NAME}"
+
+    # AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET_NAME="AZURE-FOUNDRY-PROJECT-ENDPOINT"
+    # AZURE_FOUNDRY_PROJECT_ENDPOINT=$(az cognitiveservices account project show -n ${AZURE_FOUNDRY_NAME} --project-name ${AZURE_FOUNDRY_PROJECT_NAME} -g ${RESOURCE_GROUP_NAME} --query properties.endpoints -o tsv)
+    # AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET="${AZURE_FOUNDRY_PROJECT_ENDPOINT}"
+
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_NAME_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_NAME_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_URI_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_URI_SECRET} true
+    # if [ -n "${AZURE_MODEL_DEPLOYMENT_KEY_SECRET}" ] && [ "${AZURE_MODEL_DEPLOYMENT_KEY_SECRET}" != "null" ] && [ "${AZURE_MODEL_DEPLOYMENT_KEY_SECRET}" != "" ]; then
+    #     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET} true
+    # else
+    #     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_KEY_SECRET_NAME} "null" true
+    # fi
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_API_VERSION_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET_NAME} ${AZURE_MODEL_DEPLOYMENT_MODEL_NAME_SECRET} true    
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET_NAME} ${AZURE_FOUNDRY_PROJECT_ENDPOINT_SECRET} true
+    
+    # printProgress "Uploading notebooks to Azure Storage ${AZURE_STORAGE_ACCOUNT_NAME} ..."
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-empty.ipynb" "Users/shared/deploy-model-empty.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-empty.ipynb" "Users/shared/evaluation-model-empty.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-opt350m.ipynb" "Users/shared/deploy-model-opt350m.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-opt350m.ipynb" "Users/shared/evaluation-model-opt350m.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-qwen2-15b.ipynb" "Users/shared/deploy-model-qwen2-15b.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-qwen2-15b.ipynb" "Users/shared/evaluation-model-qwen2-15b.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-open-ai.ipynb" "Users/shared/evaluation-model-open-ai.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-empty.py" "Users/shared/src/score-empty.py"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-opt350m.py" "Users/shared/src/score-opt350m.py"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-qwen2-15b.py" "Users/shared/src/score-qwen2-15b.py"
+
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"
+    updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_ML_NAME "${AZURE_ML_NAME}"
+    exit 0
+fi
+
+if [ "${ACTION}" = "configure-private-azure-ai" ] ; then
+    cmd="az config set extension.use_dynamic_install=yes_without_prompt"
+    printProgress "$cmd"
+    eval "$cmd" 1>/dev/null 2>/dev/null || true
+    
+    VISIBILITY="pri"
+    RESOURCE_GROUP_NAME=$(getAzureAIResourceGroupName "${AZURE_ENVIRONMENT}" "${VISIBILITY}" "${AZURE_SUFFIX}")
+    DEFAULT_DEPLOYMENT_PREFIX="${AZURE_ENVIRONMENT}${VISIBILITY}${AZURE_SUFFIX}"
+
+    setAzureResourceNames ${AZURE_ENVIRONMENT} "${VISIBILITY}" "${AZURE_SUFFIX}" "${RESOURCE_GROUP_NAME}"
+    printProgress "Deploy private azure ML and foundry in resource group '${RESOURCE_GROUP_NAME}'"
+    
+    CLIENT_IP_ADDRESS=$(curl -s https://ifconfig.me)
+    OBJECT_ID=$(getCurrentObjectId)
+    if [ -z "${OBJECT_ID}" ] || [ "${OBJECT_ID}" = "null" ]; then
+        printError "Cannot get current user Object Id"
+        exit 1
+    fi    
+    OBJECT_TYPE=$(getCurrentObjectType)
+    DEPLOY_NAME=$(getLatestDeploymentNameInResourceGroup ${RESOURCE_GROUP_NAME} "${DEFAULT_DEPLOYMENT_PREFIX}")
+    printProgress "Read values associated with deployment '${DEPLOY_NAME}' in resource group '${RESOURCE_GROUP_NAME}'"
     readDeploymentOutputs ${DEPLOY_NAME} ${RESOURCE_GROUP_NAME}
 
     printProgress "Store secrets in Key Vault"
