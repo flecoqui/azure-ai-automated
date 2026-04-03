@@ -93,6 +93,7 @@ resource cognitiveServicesOpenAIUserRoleAssignment 'Microsoft.Authorization/role
 
 output foundryName string = aiFoundry.name
 output foundryId string = aiFoundry.id
+output foundryPrincipalId string = aiFoundry.identity.principalId
 output projectName string = aiProject.name
 output projectId string = aiProject.id
 output modelDeploymentName string = modelDeployment.name  

@@ -60,6 +60,7 @@ module storageModule 'public-storage.bicep' = {
     storageAccountName: namingModule.outputs.storageAccountName
     defaultContainerName: namingModule.outputs.storageAccountDefaultContainerName
     clientIpAddress: clientIpAddress
+    foundryPrincipalId: foundryModule.outputs.foundryPrincipalId
     objectId: objectId
     objectType: objectType
     tags: tags

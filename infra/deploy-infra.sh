@@ -230,7 +230,7 @@ getAzureAIResourceGroupName()
     visibility="$2"
     suffix="$3"
     if [ ! -z "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP+x}" ] ; then
-        if [ "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP}" != "" ] ; then
+        if [ -z "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP}" ] && [ "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP}" != "" ] ; then
             echo "${AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP}"
             return
         fi
@@ -464,12 +464,12 @@ checkAzureConfiguration() {
             CONFIG_SUBSCRIPTION_ID=$(readConfigurationFileValue "$CONFIGURATION_FILE" "AZURE_SUBSCRIPTION_ID")
             if [ ! -z "${CONFIG_SUBSCRIPTION_ID}" ] && [ "$CONFIG_SUBSCRIPTION_ID" != "$CURRENT_SUBSCRIPTION_ID" ]; then
                 printProgress "Updating a Azure Configuration file: $CONFIGURATION_FILE value: AZURE_SUBSCRIPTION_ID=$CURRENT_SUBSCRIPTION_ID..."
-                updateConfigurationFileValue "$CONFIGURATION_FILE" "AZURE_SUBSCRIPTION_ID" "$CURRENT_SUBSCRIPTION_ID"
+                updateConfigurationFile "$CONFIGURATION_FILE" "AZURE_SUBSCRIPTION_ID" "$CURRENT_SUBSCRIPTION_ID"
             fi
             CONFIG_TENANT_ID=$(readConfigurationFileValue "$CONFIGURATION_FILE" "AZURE_TENANT_ID")
             if [ ! -z "${CONFIG_TENANT_ID}" ] && [ "$CONFIG_TENANT_ID" != "$CURRENT_TENANT_ID" ]; then
                 printProgress "Updating a Azure Configuration file: $CONFIGURATION_FILE value: AZURE_TENANT_ID=$CURRENT_TENANT_ID..."
-                updateConfigurationFileValue "$CONFIGURATION_FILE" "AZURE_TENANT_ID" "$CURRENT_TENANT_ID"
+                updateConfigurationFile "$CONFIGURATION_FILE" "AZURE_TENANT_ID" "$CURRENT_TENANT_ID"
             fi
             CONFIG_SUFFIX=$(readConfigurationFileValue "$CONFIGURATION_FILE" "AZURE_SUFFIX")
             if [ -z "${CONFIG_SUFFIX}" ]; then
