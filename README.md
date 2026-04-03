@@ -264,9 +264,11 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     - deploy-model-empty.ipynb: Notebook to deploy a model which always send the same response (used to capture the requests coming from the evaluation pipeline or notebooks)
     - deploy-model-opt350m.ipynb: Notebook to deploy the model Opt350m from Hugging Face 
     - deploy-model-qwen2-15b.ipynb: Notebook to deploy the model Qwen2-1.5b from Hugging Face
+    - deploy-model-smalllm.ipynb: Notebook to deploy the model SmolLM2-360M from Hugging Face, this model doesn't require a GPU compute instance, a CPU compute instance is sufficient to run the model
     - evaluation-model-empty.ipynb: Notebook to run safety evaluation of the empty model
     - evaluation-model-opt350m.ipynb: Notebook to run safety evaluation of the Opt350m model
     - evaluation-model-qwen2-15b.ipynb: Notebook to run safety evaluation of the Qwen2-1.5b model
+    - evaluation-model-smalllm.ipynb: Notebook to run safety evaluation of the SmolLM2-360M model
     - evaluation-model-open-ai.ipynb: Notebook to run safety evaluation of the Open AI model ('gpt-4.1-mini') deployed in Microsoft Foundry.
 
     ![Notebooks](./diagrams/notebooks.png)
@@ -275,6 +277,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     - score-empty.py: Scoring script used with empty model 
     - score-opt350m.py: Scoring script used with Opt350m model 
     - score-qwen2-15b.py: Scoring script used with Qwen2-1.5b model 
+    - score-smalllm.py: Scoring script used with SmolLM2-360M model     
 
 7. If you face any error when running the notebooks, check whether your Microsoft Entra ID token expired. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute', click on the 'Authenticate' button, to renew your Microsoft Entra ID token. This token will be used to call most of the endpoints hosting the differents models.
 
@@ -314,7 +317,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     AZURE_ENVIRONMENT defines the environment 'dev', 'stag', 'prod',...
 
 
-2. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, as all the new resources are connected to a virtual network with public access disabled, you need to establish a VPN connection to this virtual network before deploying data sources or Integration Runtimes.
+2. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, as all the new resources are connected to a virtual network with public access disabled, you need to establish a VPN connection to this virtual network before running the notebooks.
 
 3. As the Virtual Network is fully isolated, the VPN Gateway has been installed connected to the Virtual Network. You can now test this VPN Gateway.
 
@@ -328,31 +331,42 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 
 8. Launch the Azure VPN Client and import the file: `azurevpnconfig.xml` file in `AzureVPN` folder into the Azure VPN Client.
 
-9. Click on the 'Connect' button, you'll need to enter your tenant credentials to establish a connection with the virtual machine.
+9. Click on the 'Connect' button, you'll need to enter your tenant credentials to establish a connection with the virtual network.
 
-10. Once you are connected you can open the Azure Machine Learning portal url https://ml.azure.com/, and check all the menus are accessible without any errors. From this stage, if necessary you can deploy either
- - Managed VNET Integration Runtime to scan data sources connected to a VNET and using Role Based Access Control
- - Self Hosted Integration Runtime to scan data sources using a Storage Account Key stored in the Key Vault or to scan data sources on premises
+10. Once you are connected through the VPN session, you'll have to copy the notebook files and scoring files on the Azure Storage and store the configuration in Azure Key Vault. As both the Azure Storage and Azure Key Vault are connected to the VNET, the VPN connection is mandatry for the subsequent steps.
 
+11. You can now copy and configure the notebook files using the command below:
 
+    ```bash
+        vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a configure-private-azure-ai
+    ```
+    This command will fail if the VPN connection is not established. Using the dig command against the storage blob endpoint host, you can test whether the VPN connection is correctly coonfigured: the returned IP address is a private IP address and not a public IP address. below the command line:
+    
+    ```bash
+        vscode ➜ /workspaces/azure-ai-automated (main) $ dig "${storage_account}.blob.core.windows.net"
+    ```
+    
+12. Now the infrastructure if fully configured, you can open the Azure Machine Learning portal url https://ml.azure.com/, and check all the menus are accessible without any errors. 
 
-11. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, you can check whether all the associated resources are deployed. 
+13. Once Microsoft Foundry and Azure Machine Learning are deployed into your Azure subscription, you can check whether all the associated resources are deployed. 
 
-12. In the Azure Portal, select Microsoft Foundry Project resource whose name starts with foundryproject. On the Overview tab, click on the 'Go to Foundry portal' button to open the Microsoft Foundry portal. Click on the tab 'Models + endpoints'. You should see the 'gpt-4.1-mini' deployed on Microsoft Foundry.
+14. In the Azure Portal, select Microsoft Foundry Project resource whose name starts with foundryproject. On the Overview tab, click on the 'Go to Foundry portal' button to open the Microsoft Foundry portal. Click on the tab 'Models + endpoints'. You should see the 'gpt-4.1-mini' deployed on Microsoft Foundry.
 
     ![Open AI Models](./diagrams/open-ai.png)
 
-13. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute'. You should see 2 compute instances deployed, one CPU based (Standard_DS11_v2) and another one GPU based (Standard_NC4as_T4_v3).
+15. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute'. You should see 2 compute instances deployed, one CPU based (Standard_DS11_v2) and another one GPU based (Standard_NC4as_T4_v3).
 
     ![Computes](./diagrams/computes.png)
 
-14. Click on the tab 'Notebooks', you should see the following notebooks under 'Users\shared':
+16. Click on the tab 'Notebooks', you should see the following notebooks under 'Users\shared':
     - deploy-model-empty.ipynb: Notebook to deploy a model which always send the same response (used to capture the requests coming from the evaluation pipeline or notebooks)
     - deploy-model-opt350m.ipynb: Notebook to deploy the model Opt350m from Hugging Face 
     - deploy-model-qwen2-15b.ipynb: Notebook to deploy the model Qwen2-1.5b from Hugging Face
+    - deploy-model-smalllm.ipynb: Notebook to deploy the model SmolLM2-360M from Hugging Face, this model doesn't require a GPU compute instance, a CPU compute instance is sufficient to run the model
     - evaluation-model-empty.ipynb: Notebook to run safety evaluation of the empty model
     - evaluation-model-opt350m.ipynb: Notebook to run safety evaluation of the Opt350m model
     - evaluation-model-qwen2-15b.ipynb: Notebook to run safety evaluation of the Qwen2-1.5b model
+    - evaluation-model-smalllm.ipynb: Notebook to run safety evaluation of the SmolLM2-360M model
     - evaluation-model-open-ai.ipynb: Notebook to run safety evaluation of the Open AI model ('gpt-4.1-mini') deployed in Microsoft Foundry.
 
     ![Notebooks](./diagrams/notebooks.png)
@@ -361,6 +375,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     - score-empty.py: Scoring script used with empty model 
     - score-opt350m.py: Scoring script used with Opt350m model 
     - score-qwen2-15b.py: Scoring script used with Qwen2-1.5b model 
+    - score-smalllm.py: Scoring script used with SmolLM2-360M model 
 
 ##### Removing the resources
 

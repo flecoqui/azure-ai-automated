@@ -47,12 +47,15 @@ param computeInstanceCPUSize string = 'Standard_DS11_v2'
 @description('The VM size for the Azure ML compute instance GPU based.')
 param computeInstanceGPUSize string = 'Standard_NC4as_T4_v3'
 
+@description('The resource ID of the Azure AI Foundry account for managed network private endpoint.')
+param foundryId string
+
 @description('The tags to be applied to the provisioned resources.')
 param tags object
 
 var privateSubnetId = '${resourceId(vnetResourceGroupName,'Microsoft.Network/virtualNetworks', vnetName)}/subnets/${subnetName}'
 
-resource azureML 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
+resource azureML 'Microsoft.MachineLearningServices/workspaces@2025-12-01' = {
   name: azureMLName
   location: location
   identity: {
@@ -70,6 +73,87 @@ resource azureML 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
     containerRegistry: acrId
     publicNetworkAccess: 'Disabled'
     systemDatastoresAuthMode: 'identity'
+    managedNetwork: {
+      isolationMode: 'AllowOnlyApprovedOutbound'
+      outboundRules: {
+        // PyPI – pip install
+        'allow-pypi': {
+          type: 'FQDN'
+          destination: 'pypi.org'
+          category: 'UserDefined'
+        }
+        'allow-pypi-files': {
+          type: 'FQDN'
+          destination: 'files.pythonhosted.org'
+          category: 'UserDefined'
+        }
+        // Conda / conda-forge
+        'allow-conda': {
+          type: 'FQDN'
+          destination: 'conda.anaconda.org'
+          category: 'UserDefined'
+        }
+        'allow-anaconda': {
+          type: 'FQDN'
+          destination: 'repo.anaconda.com'
+          category: 'UserDefined'
+        }
+        // PyTorch wheel index + CDN
+        'allow-pytorch': {
+          type: 'FQDN'
+          destination: 'pytorch.org'
+          category: 'UserDefined'
+        }
+        'allow-pytorch-download': {
+          type: 'FQDN'
+          destination: 'download.pytorch.org'
+          category: 'UserDefined'
+        }
+        'allow-pytorch-cdn': {
+          type: 'FQDN'
+          destination: '*.pytorch.org'
+          category: 'UserDefined'
+        }
+        // HuggingFace model/dataset downloads
+        'allow-huggingface': {
+          type: 'FQDN'
+          destination: 'huggingface.co'
+          category: 'UserDefined'
+        }
+        'allow-huggingface-cdn': {
+          type: 'FQDN'
+          destination: '*.hf.co'
+          category: 'UserDefined'
+        }
+        'openai-foundry': {
+          type: 'FQDN'
+          destination: '*.cognitiveservices.azure.com'
+          category: 'UserDefined'
+        }
+        'inference-ml': {
+          type: 'FQDN'
+          destination: '*.inference.ml.azure.com'
+          category: 'UserDefined'
+        }
+        // Azure AI Foundry evaluation / red-team service (FQDN for internet path)
+        'allow-ai-services': {
+          type: 'FQDN'
+          destination: '*.services.ai.azure.com'
+          category: 'UserDefined'
+        }
+        // Private endpoint to Foundry account (bypasses public network access block)
+        'foundry-account-pe': {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: foundryId
+            subresourceTarget: 'account'
+            sparkEnabled: false
+            sparkStatus: 'Inactive'
+          }
+          category: 'UserDefined'
+        }
+      }
+    }
   }
   tags: tags
 }
@@ -85,6 +169,9 @@ resource cicpu 'Microsoft.MachineLearningServices/workspaces/computes@2025-12-01
     properties: {
       vmSize: computeInstanceCPUSize
       idleTimeBeforeShutdown: 'PT1H'
+      // subnet: {
+      //   id: privateSubnetId
+      //}
       // Assign the CI to a specific user (common in enterprise setups)
       personalComputeInstanceSettings: {
         assignedUser: {
@@ -94,6 +181,9 @@ resource cicpu 'Microsoft.MachineLearningServices/workspaces/computes@2025-12-01
       }
     }
   }
+  dependsOn: [
+    azmlPrivateEndpoint
+  ]
 }
 
 resource cigpu 'Microsoft.MachineLearningServices/workspaces/computes@2025-12-01' = {
@@ -106,6 +196,9 @@ resource cigpu 'Microsoft.MachineLearningServices/workspaces/computes@2025-12-01
     properties: {
       vmSize: computeInstanceGPUSize
       idleTimeBeforeShutdown: 'PT1H'
+      // subnet: {
+      //  id: privateSubnetId
+      // }
       // Assign the CI to a specific user (common in enterprise setups)
       personalComputeInstanceSettings: {
         assignedUser: {
@@ -115,15 +208,14 @@ resource cigpu 'Microsoft.MachineLearningServices/workspaces/computes@2025-12-01
       }
     }
   }
+  dependsOn: [
+    azmlPrivateEndpoint
+  ]
 }
 
 resource azmlPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' = {
   name: 'pe-azml-${baseName}'
   location: location
-  dependsOn: [
-    cicpu
-    cigpu
-  ]
   properties: {
     subnet: {
       id: privateSubnetId

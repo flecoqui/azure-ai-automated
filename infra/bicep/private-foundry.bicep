@@ -146,10 +146,12 @@ resource foundryPrivateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' 
 }
 
 // The role definition ID for the Cognitive Services OpenAI User role, which is required to use the Foundry account.
+// Must be scoped to the account (not the project) because the data action
+// Microsoft.CognitiveServices/accounts/OpenAI/deployments/chat/completions/action lives on the account resource.
 var roleCognitiveServicesOpenAIUser = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 resource cognitiveServicesOpenAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aiProject.id, objectId, roleCognitiveServicesOpenAIUser)
-  scope: aiProject
+  name: guid(aiFoundry.id, objectId, roleCognitiveServicesOpenAIUser)
+  scope: aiFoundry
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleCognitiveServicesOpenAIUser)
     principalId: objectId

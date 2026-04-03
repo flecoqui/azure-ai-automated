@@ -236,7 +236,8 @@ module azmlModule 'private-azml.bicep' = {
     computeInstanceName: namingModule.outputs.azureMLComputeInstanceName
     computeInstanceCPUSize: namingModule.outputs.azureMLComputeCPUSize
     computeInstanceGPUSize: namingModule.outputs.azureMLComputeGPUSize
-    objectId: objectId       
+    objectId: objectId
+    foundryId: foundryModule.outputs.foundryId
     tags: tags
   }
   dependsOn: [

@@ -2,7 +2,7 @@
 ##########################################################################################################################################################################################
 #- Purpose: Script used to install pre-requisites, deploy/undeploy service, start/stop service, test service
 #- Parameters are:
-#- [-a] ACTION - value: azure-login, deploy-public-azure-ai, deploy-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai
+#- [-a] ACTION - value: azure-login, deploy-public-azure-ai, deploy-private-azure-ai, configure-private-azure-ai,remove-public-azure-ai, remove-private-azure-ai
 #- [-e] environment - "dev", "stag", "preprod", "prod"
 #- [-c] Sets the configuration file
 #- [-t] Sets deployment Azure Tenant Id
@@ -66,7 +66,7 @@ printProgress(){
 usage() {
     echo
     echo "Arguments:"
-    printf " -a  Sets deploy-infra ACTION { azure-login, deploy-public-azure-ai, deploy-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai }\n"
+    printf " -a  Sets deploy-infra ACTION { azure-login, deploy-public-azure-ai, deploy-private-azure-ai, configure-private-azure-ai,remove-public-azure-ai, remove-private-azure-ai }\n"
     printf " -e  Sets the environment - by default 'dev' ('dev', 'test', 'stag', 'prep', 'prod')\n"
     printf " -s  Sets subscription id \n"
     printf " -t  Sets tenant id\n"
@@ -495,6 +495,33 @@ EOF
     fi
 }
 ##############################################################################
+#- isdiginstalled
+##############################################################################
+isdiginstalled() {
+    command -v dig >/dev/null && echo "true" || echo "false"
+}
+##############################################################################
+#- installdig
+##############################################################################
+installdig() {
+    printProgress "Installing dig tool for DNS resolution check..."
+    cmd="sudo apt update"
+    #printProgress "${cmd}"
+    eval "${cmd}" 2>/dev/null || true    
+    cmd="sudo apt install -y dnsutils"
+    #printProgress "${cmd}"
+    eval "${cmd}" 2>/dev/null || true
+}
+##############################################################################
+#- isStoragePrivateIP
+##############################################################################
+isStoragePrivateIP() {
+    st="$1"    
+
+    dig +short "${st}.blob.core.windows.net" | grep -E '^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)' && echo "true" || echo "false"
+}
+
+##############################################################################
 #- getCurrentObjectId
 ##############################################################################
 getCurrentObjectId() {
@@ -718,7 +745,7 @@ if [ "${ARG_ACTION}" != "deploy-public-azure-ai" ] && \
    [ "${ARG_ACTION}" != "configure-private-azure-ai" ] && \
    [ "${ARG_ACTION}" != "remove-public-azure-ai" ] && \
    [ "${ARG_ACTION}" != "remove-private-azure-ai" ]; then
-    printError "ACTION '${ARG_ACTION}' not supported, possible values: deploy-public-azure-ai, deploy-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai  "
+    printError "ACTION '${ARG_ACTION}' not supported, possible values: deploy-public-azure-ai, deploy-private-azure-ai, configure-private-azure-ai, remove-public-azure-ai, remove-private-azure-ai  "
     usage
     exit 1
 fi
@@ -841,6 +868,20 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET} true
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET} true
 
+    AZURE_ML_MODEL_SMALLLM_ID_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-ID"
+    AZURE_ML_MODEL_SMALLLM_ID_SECRET="Qwen/Qwen2-1.5B" 
+    AZURE_ML_MODEL_SMALLLM_NAME_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-NAME"
+    AZURE_ML_MODEL_SMALLLM_NAME_SECRET="empty" 
+    AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-SCORE-SCRIPT"
+    AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET="score-empty.py" 
+    AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-INSTANCE-TYPE" 
+    AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET="Standard_DS3_v2" 
+
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_ID_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_ID_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_NAME_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_NAME_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET} true
+
     AZURE_ML_MODEL_OPT350M_ID_SECRET_NAME="AZURE-ML-MODEL-OPT350M-ID"
     AZURE_ML_MODEL_OPT350M_ID_SECRET="facebook/opt-350m" 
     AZURE_ML_MODEL_OPT350M_NAME_SECRET_NAME="AZURE-ML-MODEL-OPT350M-NAME"
@@ -922,10 +963,14 @@ if [ "${ACTION}" = "deploy-public-azure-ai" ] ; then
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-opt350m.ipynb" "Users/shared/evaluation-model-opt350m.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-qwen2-15b.ipynb" "Users/shared/deploy-model-qwen2-15b.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-qwen2-15b.ipynb" "Users/shared/evaluation-model-qwen2-15b.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-smalllm.ipynb" "Users/shared/deploy-model-smalllm.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-smalllm.ipynb" "Users/shared/evaluation-model-smalllm.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-open-ai.ipynb" "Users/shared/evaluation-model-open-ai.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-empty.py" "Users/shared/src/score-empty.py"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-opt350m.py" "Users/shared/src/score-opt350m.py"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-qwen2-15b.py" "Users/shared/src/score-qwen2-15b.py"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-smalllm.py" "Users/shared/src/score-smalllm.py"
+
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_ML_NAME "${AZURE_ML_NAME}"
@@ -1006,6 +1051,21 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET} true
     # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET} true
     # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET} true
+
+    # AZURE_ML_MODEL_SMALLLM_ID_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-ID"
+    # AZURE_ML_MODEL_SMALLLM_ID_SECRET="Qwen/Qwen2-1.5B" 
+    # AZURE_ML_MODEL_SMALLLM_NAME_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-NAME"
+    # AZURE_ML_MODEL_SMALLLM_NAME_SECRET="empty" 
+    # AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-SCORE-SCRIPT"
+    # AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET="score-empty.py" 
+    # AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-INSTANCE-TYPE" 
+    # AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET="Standard_DS3_v2" 
+
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_ID_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_ID_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_NAME_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_NAME_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET} true
+    # updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET} true
+
 
     # AZURE_ML_MODEL_OPT350M_ID_SECRET_NAME="AZURE-ML-MODEL-OPT350M-ID"
     # AZURE_ML_MODEL_OPT350M_ID_SECRET="facebook/opt-350m" 
@@ -1088,10 +1148,13 @@ if [ "${ACTION}" = "deploy-private-azure-ai" ] ; then
     # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-opt350m.ipynb" "Users/shared/evaluation-model-opt350m.ipynb"
     # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-qwen2-15b.ipynb" "Users/shared/deploy-model-qwen2-15b.ipynb"
     # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-qwen2-15b.ipynb" "Users/shared/evaluation-model-qwen2-15b.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-smalllm.ipynb" "Users/shared/deploy-model-smalllm.ipynb"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-smalllm.ipynb" "Users/shared/evaluation-model-smalllm.ipynb"
     # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-open-ai.ipynb" "Users/shared/evaluation-model-open-ai.ipynb"
     # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-empty.py" "Users/shared/src/score-empty.py"
     # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-opt350m.py" "Users/shared/src/score-opt350m.py"
     # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-qwen2-15b.py" "Users/shared/src/score-qwen2-15b.py"
+    # uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-smalllm.py" "Users/shared/src/score-smalllm.py"
 
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"
@@ -1109,8 +1172,16 @@ if [ "${ACTION}" = "configure-private-azure-ai" ] ; then
     DEFAULT_DEPLOYMENT_PREFIX="${AZURE_ENVIRONMENT}${VISIBILITY}${AZURE_SUFFIX}"
 
     setAzureResourceNames ${AZURE_ENVIRONMENT} "${VISIBILITY}" "${AZURE_SUFFIX}" "${RESOURCE_GROUP_NAME}"
-    printProgress "Deploy private azure ML and foundry in resource group '${RESOURCE_GROUP_NAME}'"
-    
+    if [ "$(isdiginstalled)" = "false" ]; then
+        printProgress "Installing 'dig' command line tool"
+        installdig
+    fi      
+    if [ "$(isStoragePrivateIP "${AZURE_STORAGE_ACCOUNT_NAME}")" = "false" ]; then
+        printError "VPN connection required before configuring private Azure ML and foundry, since the storage account is not behind private endpoint. Please connect to the VPN and run the script again to configure private Azure ML and foundry."
+        exit 1
+    fi
+
+    printProgress "Configure private azure ML and foundry in resource group '${RESOURCE_GROUP_NAME}'"    
     CLIENT_IP_ADDRESS=$(curl -s https://ifconfig.me)
     OBJECT_ID=$(getCurrentObjectId)
     if [ -z "${OBJECT_ID}" ] || [ "${OBJECT_ID}" = "null" ]; then
@@ -1136,6 +1207,20 @@ if [ "${ACTION}" = "configure-private-azure-ai" ] ; then
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_NAME_SECRET} true
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_SCORE_SCRIPT_SECRET} true
     updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_EMPTY_INSTANCE_TYPE_SECRET} true
+
+    AZURE_ML_MODEL_SMALLLM_ID_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-ID"
+    AZURE_ML_MODEL_SMALLLM_ID_SECRET="HuggingFaceTB/SmolLM2-360M" 
+    AZURE_ML_MODEL_SMALLLM_NAME_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-NAME"
+    AZURE_ML_MODEL_SMALLLM_NAME_SECRET="smalllm" 
+    AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-SCORE-SCRIPT"
+    AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET="score-smalllm.py" 
+    AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET_NAME="AZURE-ML-MODEL-SMALLLM-INSTANCE-TYPE" 
+    AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET="Standard_DS3_v2" 
+
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_ID_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_ID_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_NAME_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_NAME_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_SCORE_SCRIPT_SECRET} true
+    updateSecretInKeyVault ${AZURE_KEY_VAULT_NAME} ${AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET_NAME} ${AZURE_ML_MODEL_SMALLLM_INSTANCE_TYPE_SECRET} true
 
     AZURE_ML_MODEL_OPT350M_ID_SECRET_NAME="AZURE-ML-MODEL-OPT350M-ID"
     AZURE_ML_MODEL_OPT350M_ID_SECRET="facebook/opt-350m" 
@@ -1218,10 +1303,13 @@ if [ "${ACTION}" = "configure-private-azure-ai" ] ; then
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-opt350m.ipynb" "Users/shared/evaluation-model-opt350m.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-qwen2-15b.ipynb" "Users/shared/deploy-model-qwen2-15b.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-qwen2-15b.ipynb" "Users/shared/evaluation-model-qwen2-15b.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/deploy-model-smalllm.ipynb" "Users/shared/deploy-model-smalllm.ipynb"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-smalllm.ipynb" "Users/shared/evaluation-model-smalllm.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/evaluation-model-open-ai.ipynb" "Users/shared/evaluation-model-open-ai.ipynb"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-empty.py" "Users/shared/src/score-empty.py"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-opt350m.py" "Users/shared/src/score-opt350m.py"
     uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-qwen2-15b.py" "Users/shared/src/score-qwen2-15b.py"
+    uploadNotebooks "${AZURE_ML_NAME}" "${AZURE_STORAGE_ACCOUNT_NAME}" "${AZURE_RESOURCE_GROUP_AZURE_AI_NAME}" "$SCRIPTS_DIRECTORY/../notebooks/src/score-smalllm.py" "Users/shared/src/score-smalllm.py"
 
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_NAME "${AZURE_FOUNDRY_NAME}"
     updateConfigurationFile "${CONFIGURATION_FILE}" AZURE_FOUNDRY_PROJECT_NAME "${AZURE_FOUNDRY_PROJECT_NAME}"

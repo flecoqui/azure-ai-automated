@@ -59,7 +59,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
   properties: {
     accessTier: 'Hot'
     supportsHttpsTrafficOnly: true
-    allowSharedKeyAccess: true
+    allowSharedKeyAccess: false
     isHnsEnabled: false
     networkAcls: {
       bypass: 'AzureServices'
