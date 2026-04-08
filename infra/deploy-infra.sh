@@ -518,7 +518,7 @@ installdig() {
 isStoragePrivateIP() {
     st="$1"    
 
-    dig +short "${st}.blob.core.windows.net" | grep -E '^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)' && echo "true" || echo "false"
+    dig +short "${st}.blob.core.windows.net" | grep -qE '^(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)' && echo "true" || echo "false"
 }
 
 ##############################################################################
