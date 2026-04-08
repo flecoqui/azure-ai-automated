@@ -152,7 +152,7 @@ Usually this step is not required in a pipeline as the connection with Azure is 
 
     After this step, the variables AZURE_REGION, AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID and AZURE_ENVIRONMENT used for the deployment are stored in the file ./.config/.default.env.
     The variable AZURE_DEFAULT_AZURE_AI_RESOURCE_GROUP is by default empty string.
-    By default the name of the Microsoft Foundry and Azure Machine Learning resource group will be 'rgpurview[AZURE_ENVIRONMENT][visibility][AZURE_SUFFIX]'
+    By default the name of the Microsoft Foundry and Azure Machine Learning resource group will be 'rg[AZURE_ENVIRONMENT][visibility][AZURE_SUFFIX]'
     the name of the Datasource resource group will be 'rgdatasource[AZURE_ENVIRONMENT][visibility][AZURE_SUFFIX]'
     where [visibility] value is 'pri' for private deployment and 'pub' for public deployment.
 
@@ -230,8 +230,8 @@ Usually this step is not required in a pipeline as the connection with Azure is 
         vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a deploy-public-azure-ai
     ```
 
-    After this step, the variables AZURE_SUFFIX and PURVIEW_PRINCIPAL_ID used for the deployment are stored in the file ./.config/.default.env.
-    AZURE_SUFFIX is used to name the Azure resource. For a public endpoint deployement with suffix will be "${AZURE_ENVIRONMENT}pub${AZURE_SUFFIX}", and "${AZURE_ENVIRONMENT}pri${AZURE_SUFFIX}" for a deployment with private endpoints
+    After this step, the variable AZURE_SUFFIX used for the deployment is stored in the file ./.config/.default.env.
+    AZURE_SUFFIX is used to name the Azure resource. For a public endpoint deployment with suffix will be "${AZURE_ENVIRONMENT}pub${AZURE_SUFFIX}", and "${AZURE_ENVIRONMENT}pri${AZURE_SUFFIX}" for a deployment with private endpoints
    
 
     ```bash
@@ -279,11 +279,11 @@ Usually this step is not required in a pipeline as the connection with Azure is 
     - score-qwen2-15b.py: Scoring script used with Qwen2-1.5b model 
     - score-smalllm.py: Scoring script used with SmolLM2-360M model     
 
-7. If you face any error when running the notebooks, check whether your Microsoft Entra ID token expired. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute', click on the 'Authenticate' button, to renew your Microsoft Entra ID token. This token will be used to call most of the endpoints hosting the differents models.
+6. If you face any error when running the notebooks, check whether your Microsoft Entra ID token expired. In the Azure Portal, select Azure Machine Learning Workspace resource whose name starts with 'azml'. On the Overview tab, click on the 'Launch Studio' button to open the Machine Learning portal. Click on the tab 'Compute', click on the 'Authenticate' button, to renew your Microsoft Entra ID token. This token will be used to call most of the endpoints hosting the differents models.
 
     ![Authentication Error](./diagrams/auth.png)
 
-8. When your tests are over, you can remove the infrastructure running the following commands:
+7. When your tests are over, you can remove the infrastructure running the following commands:
 
     ```bash
         vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a remove-public-azure-ai
@@ -298,8 +298,8 @@ Usually this step is not required in a pipeline as the connection with Azure is 
         vscode ➜ /workspaces/azure-ai-automated (main) $ ./infra/deploy-infra.sh   -a deploy-private-azure-ai
     ```
 
-    After this step, the variables AZURE_SUFFIX and PURVIEW_PRINCIPAL_ID used for the deployment are stored in the file ./.config/.default.env.
-    AZURE_SUFFIX is used to name the Azure resource. For a private endpoint deployement with suffix will be "${AZURE_ENVIRONMENT}pub${AZURE_SUFFIX}", and "${AZURE_ENVIRONMENT}pri${AZURE_SUFFIX}" for a deployment with private endpoints
+    After this step, the variables AZURE_SUFFIX used for the deployment is stored in the file ./.config/.default.env.
+    AZURE_SUFFIX is used to name the Azure resource. For a private endpoint deployment with suffix will be "${AZURE_ENVIRONMENT}pub${AZURE_SUFFIX}", and "${AZURE_ENVIRONMENT}pri${AZURE_SUFFIX}" for a deployment with private endpoints
 
     ```bash
         vscode ➜ /workspaces/azure-ai-automated (main) $ cat ./.config/.default.env
